@@ -77,6 +77,11 @@ _SESSION_HEADER_NAME = "X-Hermes-Session-Token"
 # or HERMES_DASHBOARD_TUI=1.  Set from :func:`start_server`.
 _DASHBOARD_EMBEDDED_CHAT_ENABLED = False
 
+# When True (set by start_server when allow_public=True), skip the loopback-only
+# guard on /api/pty, /api/ws, /api/pub, /api/events WebSocket endpoints.
+# This matches the intent of --insecure: operator explicitly opted in.
+_ALLOW_NON_LOOPBACK_WS = False
+
 # Simple rate limiter for the reveal endpoint
 _reveal_timestamps: List[float] = []
 _REVEAL_MAX_PER_WINDOW = 5
@@ -2346,7 +2351,15 @@ def _build_sidecar_url(channel: str) -> Optional[str]:
     if not host or not port:
         return None
 
-    netloc = f"[{host}]:{port}" if ":" in host and not host.startswith("[") else f"{host}:{port}"
+    # 0.0.0.0 / :: are wildcard bind addresses — not connectable by a client.
+    # The PTY child process connects *to* this URL, so map wildcards to loopback.
+    connect_host = host
+    if host in ("0.0.0.0",):
+        connect_host = "127.0.0.1"
+    elif host in ("::", "::0"):
+        connect_host = "::1"
+
+    netloc = f"[{connect_host}]:{port}" if ":" in connect_host and not connect_host.startswith("[") else f"{connect_host}:{port}"
     qs = urllib.parse.urlencode({"token": _SESSION_TOKEN, "channel": channel})
 
     return f"ws://{netloc}/api/pub?{qs}"
@@ -2387,7 +2400,7 @@ async def pty_ws(ws: WebSocket) -> None:
         return
 
     client_host = ws.client.host if ws.client else ""
-    if client_host and client_host not in _LOOPBACK_HOSTS:
+    if client_host and client_host not in _LOOPBACK_HOSTS and not _ALLOW_NON_LOOPBACK_WS:
         await ws.close(code=4403)
         return
 
@@ -2495,7 +2508,7 @@ async def gateway_ws(ws: WebSocket) -> None:
         return
 
     client_host = ws.client.host if ws.client else ""
-    if client_host and client_host not in _LOOPBACK_HOSTS:
+    if client_host and client_host not in _LOOPBACK_HOSTS and not _ALLOW_NON_LOOPBACK_WS:
         await ws.close(code=4403)
         return
 
@@ -2528,7 +2541,7 @@ async def pub_ws(ws: WebSocket) -> None:
         return
 
     client_host = ws.client.host if ws.client else ""
-    if client_host and client_host not in _LOOPBACK_HOSTS:
+    if client_host and client_host not in _LOOPBACK_HOSTS and not _ALLOW_NON_LOOPBACK_WS:
         await ws.close(code=4403)
         return
 
@@ -2558,7 +2571,7 @@ async def events_ws(ws: WebSocket) -> None:
         return
 
     client_host = ws.client.host if ws.client else ""
-    if client_host and client_host not in _LOOPBACK_HOSTS:
+    if client_host and client_host not in _LOOPBACK_HOSTS and not _ALLOW_NON_LOOPBACK_WS:
         await ws.close(code=4403)
         return
 
@@ -3134,8 +3147,9 @@ def start_server(
     """Start the web UI server."""
     import uvicorn
 
-    global _DASHBOARD_EMBEDDED_CHAT_ENABLED
+    global _DASHBOARD_EMBEDDED_CHAT_ENABLED, _ALLOW_NON_LOOPBACK_WS
     _DASHBOARD_EMBEDDED_CHAT_ENABLED = embedded_chat
+    _ALLOW_NON_LOOPBACK_WS = allow_public
 
     _LOCALHOST = ("127.0.0.1", "localhost", "::1")
     if host not in _LOCALHOST and not allow_public:

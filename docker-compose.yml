@@ -21,26 +21,45 @@
 services:
   gateway:
     build: .
-    image: hermes-agent
+    image: hermes-agent:local
+    #platform: linux/amd64
     container_name: hermes
     restart: unless-stopped
-    network_mode: host
+    networks:
+      - hermes_net
     volumes:
       - ~/.hermes:/opt/data
+    ports:
+      # 让容器内 Agent 启动的网页服务可从宿主机访问
+      - "3003:3003"
+    expose:
+      - "8642"
     environment:
       - HERMES_UID=${HERMES_UID:-10000}
       - HERMES_GID=${HERMES_GID:-10000}
-      # To expose the OpenAI-compatible API server beyond localhost,
-      # uncomment BOTH lines (API_SERVER_KEY is mandatory for auth):
-      # - API_SERVER_HOST=0.0.0.0
-      # - API_SERVER_KEY=${API_SERVER_KEY}
+      # API server for inter-container calls (OpenAI-compatible)
+      # Other containers on this compose network can call:
+      #   http://gateway:8642/v1/chat/completions
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_PORT=8642
+      - API_SERVER_KEY=${API_SERVER_KEY:-change-me}
+      - API_SERVER_MAX_REQUEST_BYTES=52428800  # 50MB，根据需要调整
     command: ["gateway", "run"]
 
+  #Author：hpfu
+  #dashboard需要访问gateway，所以必须在同一网络下；如果不需要dashboard，可以注释掉这个服务
+  #networks：与gateway服务需在同一个网络下，才能访问gateway提供的API
+
   dashboard:
-    image: hermes-agent
+    build: .
+    image: hermes-agent:local
+    #platform: linux/amd64
     container_name: hermes-dashboard
     restart: unless-stopped
-    network_mode: host
+    networks:
+      - hermes_net
+    ports:
+      - "9119:9119"
     depends_on:
       - gateway
     volumes:
@@ -48,5 +67,9 @@ services:
     environment:
       - HERMES_UID=${HERMES_UID:-10000}
       - HERMES_GID=${HERMES_GID:-10000}
-    # Localhost-only. For remote access, tunnel via `ssh -L 9119:localhost:9119`.
-    command: ["dashboard", "--host", "127.0.0.1", "--no-open"]
+      - HERMES_TUI_DIR=/opt/hermes/ui-tui
+    command: ["dashboard", "--host", "0.0.0.0", "--insecure", "--no-open", "--tui"]
+
+networks:
+  hermes_net:
+    driver: bridge

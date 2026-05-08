@@ -54,7 +54,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8642
 MAX_STORED_RESPONSES = 100
-MAX_REQUEST_BYTES = 1_000_000  # 1 MB default limit for POST bodies
+MAX_REQUEST_BYTES = int(
+    os.getenv(
+        "API_SERVER_MAX_REQUEST_BYTES",
+        os.getenv("API_MAX_UPLOAD_SIZE", "52428800"),
+    )
+)  # 50 MB default; supports both env var names
 CHAT_COMPLETIONS_SSE_KEEPALIVE_SECONDS = 30.0
 MAX_NORMALIZED_TEXT_LENGTH = 65_536  # 64 KB cap for normalized content parts
 MAX_CONTENT_LIST_SIZE = 1_000  # Max items when content is an array
@@ -807,6 +812,29 @@ class APIServerAdapter(BasePlatformAdapter):
                 }
             ],
         })
+
+    async def _handle_skills(self, request: "web.Request") -> "web.Response":
+        """GET /v1/hermes/skills — list installed Hermes skills with enabled state."""
+        auth_err = self._check_auth(request)
+        if auth_err:
+            return auth_err
+
+        try:
+            from tools.skills_tool import _find_all_skills
+            from hermes_cli.config import load_config
+            from hermes_cli.skills_config import get_disabled_skills
+
+            config = load_config()
+            disabled = get_disabled_skills(config)
+            skills = _find_all_skills(skip_disabled=False)
+            for skill in skills:
+                name = str(skill.get("name", ""))
+                skill["enabled"] = bool(name) and name not in disabled
+
+            return web.json_response({"object": "list", "data": skills})
+        except Exception as e:
+            logger.exception("Failed to list Hermes skills via API server")
+            return web.json_response(_openai_error(f"Failed to list skills: {e}"), status=500)
 
     async def _handle_chat_completions(self, request: "web.Request") -> "web.Response":
         """POST /v1/chat/completions — OpenAI Chat Completions format."""
@@ -2615,12 +2643,13 @@ class APIServerAdapter(BasePlatformAdapter):
 
         try:
             mws = [mw for mw in (cors_middleware, body_limit_middleware, security_headers_middleware) if mw is not None]
-            self._app = web.Application(middlewares=mws)
+            self._app = web.Application(middlewares=mws, client_max_size=MAX_REQUEST_BYTES)
             self._app["api_server_adapter"] = self
             self._app.router.add_get("/health", self._handle_health)
             self._app.router.add_get("/health/detailed", self._handle_health_detailed)
             self._app.router.add_get("/v1/health", self._handle_health)
             self._app.router.add_get("/v1/models", self._handle_models)
+            self._app.router.add_get("/v1/hermes/skills", self._handle_skills)
             self._app.router.add_post("/v1/chat/completions", self._handle_chat_completions)
             self._app.router.add_post("/v1/responses", self._handle_responses)
             self._app.router.add_get("/v1/responses/{response_id}", self._handle_get_response)

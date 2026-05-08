@@ -709,11 +709,11 @@ DEFAULT_CONFIG = {
         # users aren't surprised.  HERMES_TUI_RESUME=<id> always wins.
         "tui_auto_resume_recent": False,
         "bell_on_complete": False,
-        "show_reasoning": False,
-        "streaming": False,
+        "show_reasoning": True,
+        "streaming": True,
         "final_response_markdown": "strip",  # render | strip | raw
         "inline_diffs": True,     # Show inline diff previews for write actions (write_file, patch, skill_manage)
-        "show_cost": False,       # Show $ cost in the status bar (off by default)
+        "show_cost": True,       # Show $ cost in the status bar (off by default)
         "skin": "default",
         # TUI busy indicator style: kaomoji (default), emoji, unicode (braille
         # spinner), or ascii.  Live-swappable via `/indicator <style>`.
