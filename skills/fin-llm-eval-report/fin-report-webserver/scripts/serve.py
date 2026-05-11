@@ -54,11 +54,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(BASE_DIR), **kwargs)
 
     def do_GET(self):
-        if self.path in ("/", "/index"):
+        clean_path = self.path.split("?")[0].rstrip("/") or "/"
+        if clean_path in ("", "/", "/index"):
             content = build_index_page().encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(content)
         else:

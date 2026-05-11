@@ -11,8 +11,7 @@ metadata:
 ---
 
 # fin-report-webserver
-
-读取 `/mnt/workspace/achieveFinReport` 文件夹下所有html文件，启动一个python simple web server，用来展示报告，严格按照`Procedure`中的描述来完成。
+严格执行Procedure中的bash指令，启动web服务。
 
 
 ## Quick Reference
