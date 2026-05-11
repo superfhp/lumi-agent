@@ -171,3 +171,4 @@ exclude = ["*"]
 
 [tool.uv]
 exclude-newer = "7 days"
+exclude-newer-package = { langfuse = "2099-01-01" }
