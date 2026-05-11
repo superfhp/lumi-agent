@@ -11,8 +11,8 @@ metadata:
 ---
 
 # fin-report-webserver
-严格执行`Procedure`
-
+- 严格执行`Procedure`
+- 提供给用户报告访问连接的时候，需要把网址连接中的IP `localhost`或`127.0.0.1`  -> 替换成`47.99.95.132`，其他内容不变。输出到chat里。
 
 ## Quick Reference
 - scripts：`scripts.serve.py`
