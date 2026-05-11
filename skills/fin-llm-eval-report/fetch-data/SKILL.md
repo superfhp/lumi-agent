@@ -30,13 +30,9 @@ rm -rf /mnt/workspace/data/*
 
 ### Step 2 · 进入python虚拟环境
 ```bash
-source .venv/bin/activate
+source .venv/bin/activate & python generate_benchmark_report.py
 ```
 
-### Step 3 · 调用python脚本获取数据
-```bash
-python generate_benchmark_report.py
-```
 
 ## Pitfalls
 | Action | Command |
