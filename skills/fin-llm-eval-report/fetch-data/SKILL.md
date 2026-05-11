@@ -20,10 +20,25 @@ metadata:
 | create python environment | `source .venv/bin/activate` |
 | fetch data | `python generate_benchmark_report.py` |
 
-## 获取金融模型评测的原始数据
+## Procedure
 
+### Step 1 · 删除之前生成的数据文件
+```bash
+rm -rf /mnt/workspace/data/*
+```
+
+
+### Step 2 · 进入python虚拟环境
 ```bash
 source .venv/bin/activate
+```
+
+### Step 3 · 调用python脚本获取数据
+```bash
 python generate_benchmark_report.py
 ```
 
+## Pitfalls
+| Action | Command |
+|--------|---------|
+|检查`/mnt/workspace/data`目录下有没有生成`.csv`文件，且文件不为空 | 如果没有生成文件或文件为空，直接返回到chat对话中，并终止技能的后续执行。｜

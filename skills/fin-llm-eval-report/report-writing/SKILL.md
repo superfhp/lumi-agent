@@ -2,7 +2,8 @@
 name: fin-llm-eval-report
 description: >-
   报告生成：严格按照`Procedure`，生成评测报告。
-  数据：严格按照技能中描述的`输入的数据规范`，`报告结构`，`评测维度及数据来源映射`来进行生成
+  原始数据：严格使用  `fetch-data`技能获取数据`.csv`，不允许编造数据
+  规范：严格按照技能中描述的`输入的数据规范`，`报告结构`，`评测维度及数据来源映射`来进行生成
 version: 1.0.0
 author: hpfu
 license: MIT
@@ -110,7 +111,7 @@ metadata:
 ## Procedure
 
 ### Step 1 · 数据获取
-使用技能fetch-data，获取评测数据集，调用fetch-data skill一次，获取数据集之后，在`/mnt/workspace/data` 路径中检查是否生成了对应的`.csv`文件。如果生成表示成功。
+使用技能fetch-data，获取评测数据集，获取数据集之后，在`/mnt/workspace/data` 路径中检查是否生成了对应的`.csv`文件，如果没有文件生成，终止后续执行并返回：“未正确生成数据文件”。
 
 ### Step 2 · 解析数据
 解析 `/mnt/workspace/data` 目录下所有的`.csv`文件
