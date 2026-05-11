@@ -1,18 +1,19 @@
 ---
 name: fin-llm-eval-report
-description: >
-  大模型金融领域能力评测报告生成技能。
-  当用户提供评测 CSV 数据（知识问答/情绪分类/研报生成）并希望生成可视化 HTML 报告时使用。
-  触发词：'帮我生成评测报告'、'大模型能力对比'、'评测维度分析'、'帮我出一份评测报告'、'基于评测结果生成报告'、'模型对比报告'。
+description: >-
+  金融大模型评测报告生成。基于评测 CSV 数据（知识问答/情绪分类/研报生成），
+  生成包含 ECharts 交互图表的单文件 HTML 可视化报告，覆盖 7 个金融能力维度及综合排名。
+  适用场景：生成评测报告、大模型能力对比、模型评分分析、评测结果可视化、
+  金融 LLM benchmark、模型横向对比、出一份评测报告。
 version: 1.0.0
 author: hpfu
 license: MIT
-dependencies: [fetch-data]
 platforms: [linux, macos]
 metadata:
   hermes:
-    tags: [LLM, Eval, Finanical, Reporting]
+    tags: [LLM, Eval, Finance, Reporting, HTML, ECharts, Benchmark]
     category: research
+    related_skills: [fin-llm-eval-fetch-data]
     related_skills: [fetch-data]
 
 
@@ -23,7 +24,7 @@ metadata:
 覆盖 7 个金融能力维度，配置 ECharts 交互图表，每图附文字解读。
 
 ## When To Use
-  - **帮我生成评测报告** 
+  - **帮我生成评测报告**  
   - **大模型能力对比**  
   - **评测维度分析** 
   - **帮我出一份评测报告** 
@@ -111,7 +112,7 @@ metadata:
 ## Procedure
 
 ### Step 1 · 数据获取
-使用技能fetch-data，获取评测数据集，数据获取成功后存在于/mnt/workspace/data目录下
+使用技能fetch-data，获取评测数据集
 
 ### Step 2 · 解析数据
 解析 /mnt/workspace/data 目录下的csv文件
