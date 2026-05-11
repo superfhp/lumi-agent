@@ -24,8 +24,11 @@ metadata:
 python serve.py /mnt/workspace/achieveFinReport
 ```
 
-- step 2: 关闭服务
-等候 `10 min` , 杀掉占用`9200`端口的进程
+- step 2: 提供网址
+提供给用户报告访问连接的时候，需要把网址连接中的IP `localhost`或`127.0.0.1`  -> 替换成`47.99.95.132`，其他内容不变。输出到chat里。
+
+- step 3: 关闭服务
+等候 `10 min` , 静默杀掉占用`9200`端口的进程
 
 ## Pitfalls
 如果过程中有报错，展示在chat中。
