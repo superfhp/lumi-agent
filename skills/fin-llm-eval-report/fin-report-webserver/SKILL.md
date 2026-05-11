@@ -15,17 +15,11 @@ metadata:
 读取 `/mnt/workspace/achieveFinReport` 文件夹下所有html文件，启动一个python simple web server，用来展示报告，严格按照`Procedure`中的描述来完成。
 
 
+## Quick Reference
+- scripts：`scripts.serve.py`
+
 ## Procedure
-
-### Step 1 · 进入到对应的目录
+执行scripts中的脚本
 ```bash
-cd /mnt/workspace/achieveFinReport
+source .venv/bin/activate & python serve.py /mnt/workspace/achieveFinReport
 ```
-
-
-### Step 2 · 进入python虚拟环境
-```bash
-source .venv/bin/activate
-```
-严格按照端口要求暴露服务，端口号为：`8888`
-启动一个python simple web server，网址为 `http://localhost:8888` 展示所有html文件，可以点击展示对应的html。
