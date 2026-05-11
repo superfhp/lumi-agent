@@ -110,10 +110,10 @@ metadata:
 ## Procedure
 
 ### Step 1 · 数据获取
-使用技能fetch-data，获取评测数据集
+使用技能fetch-data，获取评测数据集，调用fetch-data skill一次，获取数据集之后，在`/mnt/workspace/data` 路径中检查是否生成了对应的`.csv`文件。如果生成表示成功。
 
 ### Step 2 · 解析数据
-解析 /mnt/workspace/data 目录下的csv文件
+解析 `/mnt/workspace/data` 目录下所有的`.csv`文件
 
 ```python
 # 伪代码：解析所有 CSV
