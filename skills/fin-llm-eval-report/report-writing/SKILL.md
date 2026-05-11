@@ -149,13 +149,13 @@ for each CSV:
 5. 研报生成质量对比（factuality vs recall 分化）
 
 ### Step 5 · 构建 HTML 骨架
-参考 `references/css-skeleton.md`：
+严格参考 `references/css-skeleton.md`：
 - 左侧固定侧边栏（宽 220px）+ 右侧滚动内容区
 - CSS Custom Properties 定义颜色系统
 - IntersectionObserver 驱动侧边栏 active 状态
 
 ### Step 6 · 嵌入图表
-参考 `references/chart-templates.md`：
+严格参考 `references/chart-templates.md`：
 - ECharts 5.4.3 CDN 引入
 - IntersectionObserver 懒初始化（进入视口才渲染）
 - 每图下方固定 `<div class="chart-insight">` 解读文字
