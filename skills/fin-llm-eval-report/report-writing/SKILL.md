@@ -4,19 +4,19 @@ description: >
   大模型金融领域能力评测报告生成技能。
   当用户提供评测 CSV 数据（知识问答/情绪分类/研报生成）并希望生成可视化 HTML 报告时使用。
   触发词：'帮我生成评测报告'、'大模型能力对比'、'评测维度分析'、'帮我出一份评测报告'、'基于评测结果生成报告'、'模型对比报告'。
-triggers:
-  - 帮我生成评测报告
-  - 大模型能力对比
-  - 评测维度分析
-  - 帮我出一份评测报告
-  - 基于评测结果生成报告
-  - 模型对比报告
-references:
-  - references/chart-templates.md
-  - references/css-skeleton.md
----
+version: 1.0.0
+author: hpfu
+license: MIT
+dependencies: [fetch-data]
+platforms: [linux, macos]
+metadata:
+  hermes:
+    tags: [LLM, Eval, Finanical, Reporting]
+    category: research
+    related_skills: [fetch-data]
 
-# 金融大模型评测报告生成技能
+
+---
 
 ## 技能定位
 
@@ -24,6 +24,20 @@ references:
 覆盖 7 个金融能力维度，配置 ECharts 交互图表，每图附文字解读。
 
 ---
+## When To Use This Skill
+  - **帮我生成评测报告** 
+  - **大模型能力对比**  
+  - **评测维度分析** 
+  - **帮我出一份评测报告** 
+  - **基于评测结果生成报告** 
+  - **模型对比报告** 
+
+## Quick Reference：
+| 参考描述 | 参考文件位置 |
+|--------|---------|
+| 图例参考 | `references/chart-templates.md` |
+| 嵌入图表 | `references/css-skeleton.md` |
+
 
 ## 输入数据规范
 
@@ -98,9 +112,14 @@ references:
 
 ## 8 步生成工作流
 
-### Step 1 · 解析 CSV 数据
+### Step 1 · 数据获取
+使用技能fetch-data，获取评测数据集，数据获取成功后存在于/mnt/workspace/data目录下
+
+### Step 2 · 解析数据
+解析 /mnt/workspace/data 目录下的csv文件
+
 ```python
-# 伪代码：解析三份 CSV
+# 伪代码：解析所有 CSV
 for each CSV:
     detect model column
     detect score columns (Accuracy / factuality_score / recall_score)
@@ -155,8 +174,12 @@ for each CSV:
 - [ ] 附录默认折叠
 - [ ] 题目数量显示为唯一题数（÷模型数）
 - [ ] HTML 文件完全自包含（无外部依赖除 ECharts CDN）
-
 ---
+
+### Step 9 · 文件归档
+
+- 生成的报告命名为：「finEvalReport-YYYYMMDD-HHMMSS.html」,文件名中`YYYYMMDD-HHMMSS`用生成本报告时的当前「年月日-时分秒」替换。
+- 生成的报告保存在 `/mnt/workspace/achieveFinReport`目录下
 
 ## 视觉规范
 
