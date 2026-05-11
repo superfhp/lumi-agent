@@ -10,7 +10,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-PORT = 8080
+PORT = 9200
 BASE_DIR = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).parent.resolve()
 
 
