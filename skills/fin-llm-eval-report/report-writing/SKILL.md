@@ -17,14 +17,12 @@ metadata:
 
 
 ---
-
-## 技能定位
+# Skill Title
 
 基于三类评测 CSV 数据，生成面向汇报演示的单文件自包含 HTML 可视化报告。
 覆盖 7 个金融能力维度，配置 ECharts 交互图表，每图附文字解读。
 
----
-## When To Use This Skill
+## When To Use
   - **帮我生成评测报告** 
   - **大模型能力对比**  
   - **评测维度分析** 
@@ -32,7 +30,7 @@ metadata:
   - **基于评测结果生成报告** 
   - **模型对比报告** 
 
-## Quick Reference：
+## Quick Reference
 | 参考描述 | 参考文件位置 |
 |--------|---------|
 | 图例参考 | `references/chart-templates.md` |
@@ -110,7 +108,7 @@ metadata:
 
 ---
 
-## 8 步生成工作流
+## Procedure
 
 ### Step 1 · 数据获取
 使用技能fetch-data，获取评测数据集，数据获取成功后存在于/mnt/workspace/data目录下
