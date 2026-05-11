@@ -1,6 +1,6 @@
 ---
 name: fetch-data
-description: "Connect to the Lumi to get the evaluation data."
+description: "严格按照`Procedure`执行步骤，过程中不允许出现任何额外的脚本，以及捏造数据。"
 version: 1.0.0
 author: Hpfu
 license: MIT
@@ -12,6 +12,7 @@ metadata:
 
 # fetch-data
 
+严格按照`Procedure`执行步骤，过程中不允许出现任何额外的脚本，以及捏造数据。
 通过python调用 script.generate_benchmark_report.py 获取金融评测的原始数据，归档在 /mnt/workspace/data 目录下
 
 ## Quick Reference
