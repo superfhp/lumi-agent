@@ -178,7 +178,7 @@ for each CSV:
 - 生成的报告命名为：「finEvalReport-YYYYMMDD-HHMMSS.html」,文件名中`YYYYMMDD-HHMMSS`用生成本报告时的当前「年月日-时分秒」替换。
 - 生成的报告保存在 `/mnt/workspace/achieveFinReport`目录下
 
-### Step 9 · 展示报告
+### Step 10 · 展示报告
 - 使用 `fin-report-webserver` 技能，在chat中输入网址给到用户。网址严格按照技能中的描述来生成。
 
 ## 视觉规范
