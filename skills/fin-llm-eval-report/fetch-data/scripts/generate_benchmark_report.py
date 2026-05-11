@@ -11,6 +11,8 @@
 import os
 import re
 import json
+import requests
+from requests.auth import HTTPBasicAuth
 import pandas as pd
 from tqdm import tqdm
 from langfuse import Langfuse
@@ -18,80 +20,23 @@ from langfuse import Langfuse
 # ===============================================================
 # 1. 配置
 # ===============================================================
+LANGFUSE_HOST = os.environ.get("LANGFUSE_HOST", "http://172.16.217.161:3000")
+LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "pk-lf-6c9a9751-70cc-4def-b650-533e176374a9")
+LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "sk-lf-c3dd7903-0c39-4faf-bec9-c4e9448b105a")
+AUTH = HTTPBasicAuth(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)
+
 lf = Langfuse(
-    public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", "pk-lf-6c9a9751-70cc-4def-b650-533e176374a9"),
-    secret_key=os.environ.get("LANGFUSE_SECRET_KEY", "sk-lf-c3dd7903-0c39-4faf-bec9-c4e9448b105a"),
-    host="http://lumi:3000"
+    public_key=LANGFUSE_PUBLIC_KEY,
+    secret_key=LANGFUSE_SECRET_KEY,
+    host=LANGFUSE_HOST
 )
 
 # ── 要提取的 dataset → run 列表，支持同一模型多个版本 ────────────
 # 留空列表表示"自动拉取该 dataset 下所有 run"
 TARGETS = {
-    "CFA-Level1-2018": [
-        "glm-5_0.1_round1_CFA-Level1-2018_round1",
-        "safety_0.1_round1_CFA-Level1-2018_round1",
-        "safety_0.1_round1_CFA-Level1-2018_round2",
-        "deepseek-v3.2_0.1_round1_CFA-Level1-2018_round2",
-        "deepseek-v3.2_0.1_round1_CFA-Level1-2018_round1",
-        "kimi-k2.5_0.1_round1_CFA-Level1-2018_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level1-2018_round1",
-        "qwen3.6-plus_0.1_round1_CFA-Level1-2018_round1",
-        "qwen3.6-plus_0.1_round1_CFA-Level1-2018_round2"
-    ],
-    "CFA-Level1-2018-Variants":[
-        "glm-5_0.1_round1_CFA-Level1-2018-Variants_round1",
-        "safety_0.1_round1_CFA-Level1-2018-Variants_round1",
-        "safety_0.1_round1_CFA-Level1-2018-Variants_round2",
-        "qwen3.6-plus_0.1_round1_CFA-Level1-2018-Variants_round2",
-        "qwen3.6-plus_0.1_round1_CFA-Level1-2018-Variants_round1",
-        "deepseek-v3.2_0.1_round1_CFA-Level1-2018-Variants_round1",
-        "deepseek-v3.2_0.1_round1_CFA-Level1-2018-Variants_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level1-2018-Variants_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level1-2018-Variants_round1"
-    ],
-    "CFA-Level2-2025":[
-        "glm-5_0.1_round1_CFA-Level2-2025_round1",
-        "safety_0.1_round1_CFA-Level2-2025_round1",
-        "safety_0.1_round1_CFA-Level2-2025_round2",
-        "qwen3.6-plus_0.1_round1_CFA-Level2-2025_round2",
-        "qwen3.6-plus_0.1_round1_CFA-Level2-2025_round1",
-        "deepseek-v3.2_0.1_round1_CFA-Level2-2025_round1",
-        "deepseek-v3.2_0.1_round1_CFA-Level2-2025_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level2-2025_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level2-2025_round1"
-    ],
-    "CFA-Level2-2025-Variants":[
-        "glm-5_0.1_round1_CFA-Level2-2025-Variants_round1",
-        "safety_0.1_round1_CFA-Level2-2025-Variants_round1",
-        "safety_0.1_round1_CFA-Level2-2025-Variants_round2",
-        "qwen3.6-plus_0.1_round1_CFA-Level2-2025-Variants_round2",
-        "qwen3.6-plus_0.1_round1_CFA-Level2-2025-Variants_round1",
-        "deepseek-v3.2_0.1_round1_CFA-Level2-2025-Variants_round1",
-        "deepseek-v3.2_0.1_round1_CFA-Level2-2025-Variants_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level2-2025-Variants_round2",
-        "kimi-k2.5_0.1_round1_CFA-Level2-2025-Variants_round1"
-    ],
-    "CFA-2-2015-round1":[
-        "glm-5_0.1_round1_CFA-2-2015_round1",
-        "safety_0.1_round1_CFA-2-2015_round1",
-        "safety_0.1_round1_CFA-2-2015_round2",
-        "qwen3.6-plus_0.1_round1_CFA-2-2015_round2",
-        "qwen3.6-plus_0.1_round1_CFA-2-2015_round1",
-        "deepseek-v3.2_0.1_round1_CFA-2-2015_round1",
-        "deepseek-v3.2_0.1_round1_CFA-2-2015_round2",
-        "kimi-k2.5_0.1_round1_CFA-2-2015_round2",
-        "kimi-k2.5_0.1_round1_CFA-2-2015_round1"
-    ],
-    "CFA-2-2015-Variants":[
-        "glm-5_0.1_round1_CFA-2-2015-Variants_round1",
-        "safety_0.1_round1_CFA-2-2015-Variants_round1",
-        "safety_0.1_round1_CFA-2-2015-Variants_round2",
-        "qwen3.6-plus_0.1_round1_CFA-2-2015-Variants_round2",
-        "qwen3.6-plus_0.1_round1_CFA-2-2015-Variants_round1",
-        "deepseek-v3.2_0.1_round1_CFA-2-2015-Variants_round1",
-        "deepseek-v3.2_0.1_round1_CFA-2-2015-Variants_round2",
-        "kimi-k2.5_0.1_round1_CFA-2-2015-Variants_round2",
-        "kimi-k2.5_0.1_round1_CFA-2-2015-Variants_round1"
+    "Fin-dataset-1": [
+        "claude-sonnet-4-6_20260428_nochoices_0.1_Fin-dataset-1",
+        "claude-sonnet-4-5_20260428_nochoices_0.1_Fin-dataset-1"
     ]
     # 可继续追加其他 dataset / run
     # "CFA-Level2-2025": [],
@@ -117,10 +62,18 @@ def extract_generation(observations: list) -> tuple:
     返回 (actual_output, input_tokens, output_tokens, total_tokens)
     """
     for obs in observations:
-        if getattr(obs, "type", "") == "GENERATION":
-            output = obs.output or ""
-            usage = obs.usage
+        obs_type = obs.get("type", "") if isinstance(obs, dict) else getattr(obs, "type", "")
+        if obs_type == "GENERATION":
+            output = (obs.get("output") if isinstance(obs, dict) else obs.output) or ""
+            usage = obs.get("usage") if isinstance(obs, dict) else obs.usage
             if usage:
+                if isinstance(usage, dict):
+                    return (
+                        output,
+                        usage.get("input", 0) or 0,
+                        usage.get("output", 0) or 0,
+                        usage.get("total", 0) or 0,
+                    )
                 return (
                     output,
                     getattr(usage, "input", 0) or 0,
@@ -148,7 +101,7 @@ def get_all_runs(dataset_name: str, specified_runs: list) -> list:
             os.environ.get("LANGFUSE_SECRET_KEY", "sk-lf-53fc113b-95e9-400a-ab8d-ad877ab03f67"),
         )
         r = requests.get(
-            f"http://lumi:3000/api/public/datasets/{dataset_name}/runs",
+            f"{LANGFUSE_HOST}/api/public/datasets/{dataset_name}/runs",
             auth=AUTH, params={"limit": 100}
         )
         return [x["name"] for x in r.json().get("data", [])] if r.ok else []
@@ -168,10 +121,37 @@ def export_eval_report():
         for run_name in run_names:
             print(f"  ▶ Run: {run_name}")
 
-            # ── 3.1 通过 get_dataset_run 拿到所有关联记录 ──────────
+            # ── 3.1 通过 HTTP API 拿到所有关联记录（兼容 langfuse v4）──
             try:
-                run_obj = lf.get_dataset_run(dataset_name, run_name)
-                run_items = run_obj.dataset_run_items or []
+                # 先查 dataset id 和确认 run 存在
+                runs_resp = requests.get(
+                    f"{LANGFUSE_HOST}/api/public/datasets/{dataset_name}/runs",
+                    auth=AUTH, params={"limit": 100},
+                )
+                runs_resp.raise_for_status()
+                runs_data = runs_resp.json().get("data", [])
+                run_info = next((r for r in runs_data if r["name"] == run_name), None)
+                if not run_info:
+                    print(f"    ⚠️ 未找到 run: {run_name}")
+                    continue
+                dataset_id = run_info["datasetId"]
+
+                # 用 datasetId + runName 拉取所有 items
+                run_items = []
+                page = 1
+                while True:
+                    resp = requests.get(
+                        f"{LANGFUSE_HOST}/api/public/dataset-run-items",
+                        auth=AUTH,
+                        params={"datasetId": dataset_id, "runName": run_name, "limit": 100, "page": page},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    batch = data.get("data", [])
+                    run_items.extend(batch)
+                    if len(batch) < 100:
+                        break
+                    page += 1
             except Exception as e:
                 print(f"    ⚠️ 获取 run 失败: {e}")
                 continue
@@ -179,15 +159,20 @@ def export_eval_report():
             print(f"    🔗 共 {len(run_items)} 条关联记录，开始逐条拉取...")
 
             for ri in tqdm(run_items, desc=f"    {run_name[:40]}", leave=False):
-                dataset_item_id = ri.dataset_item_id
-                trace_id        = ri.trace_id  # run_item.trace_id 是正确字段
+                dataset_item_id = ri.get("datasetItemId") or ri.get("dataset_item_id")
+                trace_id        = ri.get("traceId") or ri.get("trace_id")
 
                 # ── 3.2 Dataset Item：题目 & 参考答案 ───────────────
                 try:
-                    di = lf.client.dataset_items.get(dataset_item_id)
-                    raw_input    = di.input    or {}
-                    raw_expected = di.expected_output or {}
-                    item_meta    = safe_meta(di.metadata)
+                    di_resp = requests.get(
+                        f"{LANGFUSE_HOST}/api/public/dataset-items/{dataset_item_id}",
+                        auth=AUTH,
+                    )
+                    di_resp.raise_for_status()
+                    di = di_resp.json()
+                    raw_input    = di.get("input")    or {}
+                    raw_expected = di.get("expectedOutput") or {}
+                    item_meta    = safe_meta(di.get("metadata"))
 
                     # input 是 dict：提取 question + options
                     if isinstance(raw_input, dict):
@@ -206,8 +191,8 @@ def export_eval_report():
                     else:
                         reference = str(raw_expected)
 
-                    item_difficulty = item_meta.get("difficulty_level", "")
-                    item_category   = item_meta.get("cfa_category", "")
+                    item_difficulty = item_meta.get("difficulty_level", "") or item_meta.get("difficultyLevel", "")
+                    item_category   = item_meta.get("cfa_category", "") or item_meta.get("cfaCategory", "")
 
                 except Exception as e:
                     print(f"\n    ⚠️ dataset_item {dataset_item_id} 获取失败: {e}")
@@ -217,34 +202,38 @@ def export_eval_report():
                 if not trace_id:
                     continue
                 try:
-                    trace = lf.client.trace.get(trace_id)
+                    tr_resp = requests.get(
+                        f"{LANGFUSE_HOST}/api/public/traces/{trace_id}",
+                        auth=AUTH,
+                    )
+                    tr_resp.raise_for_status()
+                    trace = tr_resp.json()
                 except Exception as e:
                     print(f"\n    ⚠️ trace {trace_id} 获取失败: {e}")
                     continue
 
-                trace_meta = safe_meta(trace.metadata)
+                trace_meta = safe_meta(trace.get("metadata"))
 
                 # 分数
                 scores_dict = {}
                 comments_dict = {}
-                if trace.scores:
-                    for s in trace.scores:
-                        key = s.name.lower()
-                        scores_dict[key] = s.value
-                        comments_dict[key] = getattr(s, "comment", None) or ""
+                for s in trace.get("scores") or []:
+                    key = s.get("name", "").lower()
+                    scores_dict[key] = s.get("value")
+                    comments_dict[key] = s.get("comment") or ""
 
                 # 实际回答 & token 从 GENERATION observation 取
                 actual_output, tok_in, tok_out, tok_total = extract_generation(
-                    trace.observations or []
+                    trace.get("observations") or []
                 )
 
                 # 模型版本：直接使用 run_name（可按需解析）
-                model_name    = trace_meta.get("tested_model", run_name.split("_")[0])
+                model_name    = trace_meta.get("tested_model") or trace_meta.get("testedModel") or run_name.split("_")[0]
                 model_version = run_name   # 完整 run_name 作为版本标识，便于趋势对比
 
                 # 所属领域 & 难度：trace metadata 优先，item metadata 兜底
-                domain     = trace_meta.get("cfa_category", item_category) or item_category
-                difficulty = trace_meta.get("difficulty_level", item_difficulty) or item_difficulty
+                domain     = trace_meta.get("cfa_category") or trace_meta.get("cfaCategory") or item_category
+                difficulty = trace_meta.get("difficulty_level") or trace_meta.get("difficultyLevel") or item_difficulty
 
                 # 轮次：取 run_name 中最后一个 _round 后缀
                 round_match = re.search(r'_(round\d+)$', run_name)
@@ -270,8 +259,8 @@ def export_eval_report():
                     "Token_Input":    tok_in,
                     "Token_Output":   tok_out,
                     "Token_Total":    tok_total,
-                    "Latency (s)":    trace.latency,
-                    "总费用($)":      getattr(trace, "total_cost", 0) or 0,
+                    "Latency (s)":    trace.get("latency"),
+                    "总费用($)":      trace.get("totalCost") or trace.get("total_cost") or 0,
                 }
                 all_rows.append(row)
 
