@@ -12,7 +12,6 @@ metadata:
   hermes:
     tags: [LLM, Eval, Finance, Reporting, HTML, ECharts, Benchmark]
     category: research
-    related_skills: [fin-llm-eval-fetch-data]
     related_skills: [fetch-data]
 
 

@@ -27,5 +27,6 @@ cd /mnt/workspace/achieveFinReport
 ```bash
 source .venv/bin/activate
 ```
+严格按照端口要求暴露服务，端口号为：`9121`
 启动一个python simple web server，网址为 `http://localhost:9121` 展示所有html文件，可以点击展示对应的html。
 
