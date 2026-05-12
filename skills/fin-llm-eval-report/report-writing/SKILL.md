@@ -239,6 +239,9 @@ kill -9 {进程ID}
 nohup python3 /mnt/workspace/lumi-agent/serve.py /mnt/workspace/achieveFinReport/
 ```
 
+4. 提供给用户报告访问链接
+  `http://47.99.95.132:9200/lumifinreport/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
+
 
 
 
