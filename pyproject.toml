@@ -19,6 +19,7 @@ dependencies = [
   "fire>=0.7.1,<1",
   "httpx[socks]>=0.28.1,<1",
   "rich>=14.3.3,<15",
+  "tqdm>=4.67.1,<5",
   "tenacity>=9.1.4,<10",
   "pyyaml>=6.0.2,<7",
   "requests>=2.33.0,<3",  # CVE-2026-25645
