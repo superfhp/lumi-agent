@@ -18,7 +18,7 @@ metadata:
 ## Quick Reference
 | Action | Command |
 |--------|---------|
-| create python environment | `source .venv/bin/activate` |
+| create python environment | `source /mnt/workspace/lumi-agent/venv/bin/activate` |
 | fetch data | `python generate_benchmark_report.py` |
 
 ## Procedure
