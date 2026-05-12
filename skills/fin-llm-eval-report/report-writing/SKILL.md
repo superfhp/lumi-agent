@@ -236,7 +236,7 @@ kill -9 {进程ID}
 ```
 3. 重新启动web service
 ```bash
-nohup python3 /mnt/workspace/lumi-agent/serve.py /mnt/workspace/achieveFinReport/
+deactivate & nohup python3 /mnt/workspace/lumi-agent/serve.py /mnt/workspace/achieveFinReport/
 ```
 
 4. 提供给用户报告访问链接
