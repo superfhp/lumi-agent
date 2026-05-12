@@ -14,6 +14,7 @@ metadata:
 
 严格按照`Procedure`执行步骤，过程中不允许出现任何额外的脚本，以及捏造数据。
 通过python调用 script.generate_benchmark_report.py 获取金融评测的原始数据，归档在 /mnt/workspace/data 目录下
+不允许用系统python环境，必须根据技能中的描述创建虚拟环境。
 
 ## Quick Reference
 | Action | Command |
@@ -31,9 +32,16 @@ rm -rf /mnt/workspace/data/*
 
 ### Step 2 · 进入python虚拟环境
 ```bash
-source source /mnt/workspace/lumi-agent/venv/bin/activate & python generate_benchmark_report.py
+source source /mnt/workspace/lumi-agent/venv/bin/activate 
 ```
 
+### Step 3 · 执行python脚本
+
+在系统进入到虚拟环境之后执行下面bash指令。
+
+```bash
+python generate_benchmark_report.py 
+```
 
 ## Pitfalls
 | Action | Command |
