@@ -44,7 +44,7 @@ def build_index_page():
 </style>
 </head>
 <body>
-<h1>📄 HTML 文件列表</h1>
+<h1>Lumi LLM Financial Evaluation Report</h1>
 <ul>{items}</ul>
 </body>
 </html>"""
