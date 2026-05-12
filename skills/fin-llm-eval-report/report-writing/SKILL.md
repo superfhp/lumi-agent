@@ -1,8 +1,6 @@
 ---
 name: report-writing
-description: >-
-基于三类评测 CSV 数据，生成面向汇报演示的单文件自包含 HTML 可视化报告。
-覆盖 7 个金融能力维度，配置 ECharts 交互图表，每图附文字解读。
+description: 基于三类评测 CSV 数据，生成面向汇报演示的单文件自包含 HTML 可视化报告。覆盖 7 个金融能力维度，配置 ECharts 交互图表，每图附文字解读。
 version: 1.0.0
 author: hpfu
 license: MIT
