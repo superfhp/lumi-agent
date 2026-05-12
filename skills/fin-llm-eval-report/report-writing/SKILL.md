@@ -219,7 +219,7 @@ for each CSV:
 - 生成的报告保存在 `/mnt/workspace/achieveFinReport`目录下
 
 ### Step 10 · 展示报告
-- 检查9200端口的web服务：检查网址`http://localhost:9200/lumifinreport/`是否能够正常访问。
+- 检查9200端口的web服务：检查网址`http://localhost:9200`是否能够正常访问。
 - 提供给用户报告访问链接 `http://47.99.95.132:9200/lumifinreport/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
 
 ## Pitfalls
@@ -237,7 +237,7 @@ kill -9 {进程ID}
 deactivate & nohup python3 /mnt/workspace/lumi-agent/serve.py /mnt/workspace/achieveFinReport/
 ```
 
-4. 提供给用户报告访问链接
+4. 提供给用户报告访问链接到对话中
   `http://47.99.95.132:9200/lumifinreport/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
 
 
