@@ -154,6 +154,7 @@ for each CSV:
 - CSS Custom Properties 定义颜色系统
 - IntersectionObserver 驱动侧边栏 active 状态
 
+
 ### Step 6 · 嵌入图表
 严格参考 `references/chart-templates.md`：
 - ECharts 5.4.3 CDN 引入
@@ -181,19 +182,10 @@ for each CSV:
 - 生成的报告保存在 `/mnt/workspace/achieveFinReport`目录下
 
 ### Step 10 · 展示报告
-- 使用 `fin-report-webserver` 技能，在chat中输入网址给到用户。网址严格按照技能中的描述来生成。
-- 提供给用户报告访问连接的时候，需要把网址连接中的IP `localhost`或`127.0.0.1`  -> 替换成`47.99.95.132`，其他内容不变。
+- 检查网址: `http://localhost:9200/{finEvalReport-YYYYMMDD-HHMMSS.html}` 是否服务正常，如果不正常发送到对话：`web服务异常，无法展示报告`
+- 提供给用户报告访问链接 `http://47.99.95.132:9200/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
 
 ## 视觉规范
-
-### 颜色系统
-```css
---bg: #F8FAFC;           /* 页面背景 */
---card: #FFFFFF;          /* 卡片背景 */
---sidebar-bg: #F1F5F9;   /* 侧边栏背景 */
---primary: #3B82F6;       /* 主色蓝 */
---muted: #64748B;         /* 次要文字 */
-```
 
 ### 模型配色（可扩展）
 ```js
@@ -216,7 +208,7 @@ for each CSV:
 
 ---
 
-## 归因分析专项规范（第8节）
+## 归因分析专项规范
 
 ### 数据来源
 使用 CSV 中的评分理由列：
