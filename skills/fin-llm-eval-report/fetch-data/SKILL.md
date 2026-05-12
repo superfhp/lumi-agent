@@ -31,7 +31,7 @@ rm -rf /mnt/workspace/data/*
 
 ### Step 2 · 进入python虚拟环境
 ```bash
-source .venv/bin/activate & python generate_benchmark_report.py
+source source /mnt/workspace/lumi-agent/venv/bin/activate & python generate_benchmark_report.py
 ```
 
 
