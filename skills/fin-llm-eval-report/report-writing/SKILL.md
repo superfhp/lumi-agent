@@ -183,7 +183,7 @@ for each CSV:
 
 ### Step 10 · 展示报告
 - 检查网址: `http://localhost:9200/{finEvalReport-YYYYMMDD-HHMMSS.html}` 是否服务正常，如果不正常发送到对话：`web服务异常，无法展示报告`
-- 提供给用户报告访问链接 `http://47.99.95.132:9200/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
+- 提供给用户报告访问链接 `http://47.99.95.132:9200/lumifinreport/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
 
 ## 视觉规范
 
