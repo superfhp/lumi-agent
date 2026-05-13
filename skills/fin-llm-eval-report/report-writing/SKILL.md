@@ -142,7 +142,8 @@ metadata:
 
 
 ## Limitations
-  - 写操作授权：过程中生成任何文件，或对任何文件进行编辑操作，均需要在对话中二次授权。
+  - 操作授权：过程中生成任何可执行文件（如`.py`,`.sh`），或对任何文件进行编辑操作，均需要在对话中二次授权。
+  - 可执行文件存放路径：生成的python文件（`.py`），shell文件（`.sh`）等，需要存放在`report-writing/scripts`目录下
   - 执行步骤规范：严格按照`Procedure`，生成评测报告。
   - 安装授权：给系统安装任何扩展组件，如`pip`，`apt` 等安装指令时，需要在对话中二次确认授权。
 
@@ -219,12 +220,12 @@ for each CSV:
 - 生成的报告保存在 `/mnt/workspace/achieveFinReport`目录下
 
 ### Step 10 · 展示报告
+- 提供给用户报告访问链接 `http://47.99.95.132:9200/lumifinreport/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
+
 - 检查9200端口的web服务：检查9200端口是否能够正常访问。
 ```bash
 ss -tulnp | grep :9200
 ```
-
-- 提供给用户报告访问链接 `http://47.99.95.132:9200/lumifinreport/{finEvalReport-YYYYMMDD-HHMMSS.html}`,其中`finEvalReport-YYYYMMDD-HHMMSS.html}`为本次生成报告。
 
 
 ## Pitfalls
