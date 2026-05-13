@@ -61,13 +61,19 @@ def get_all_dataset_names() -> list:
 def build_targets_from_all_datasets() -> dict:
     """通过 get_dataset() 获取全量 dataset，并构建 TARGETS（run 留空=自动拉取）"""
     targets = {}
-    for dataset_name in get_all_dataset_names():
+    dataset_names = get_all_dataset_names()
+    print(f"\n🔍 发现 {len(dataset_names)} 个 dataset: {dataset_names}")
+    
+    for dataset_name in dataset_names:
         try:
             # 用 get_dataset() 拉取完整 dataset 对象，确保该 dataset 可访问
             ds = lf.get_dataset(dataset_name)
             targets[getattr(ds, "name", dataset_name)] = []
+            print(f"   ✅ 已加入: {dataset_name}")
         except Exception as e:
-            print(f"⚠️ 跳过 dataset {dataset_name}（get_dataset失败）: {e}")
+            print(f"   ⚠️ 跳过 {dataset_name}（get_dataset失败）: {e}")
+    
+    print(f"\n✨ TARGETS 最终配置: {list(targets.keys())}\n")
     return targets
 
 
@@ -119,23 +125,33 @@ def get_all_runs(dataset_name: str, specified_runs: list) -> list:
     """返回要处理的 run name 列表（指定或自动发现）"""
     if specified_runs:
         return specified_runs
+    
     # 自动发现该 dataset 下所有 run
     try:
         runs_res = lf.client.datasets.get_runs(dataset_name)
-        return [r.name for r in (runs_res.data or [])]
-    except Exception:
-        # fallback: 用 HTTP
-        import requests
-        from requests.auth import HTTPBasicAuth
-        AUTH = HTTPBasicAuth(
-            os.environ.get("LANGFUSE_PUBLIC_KEY", "pk-lf-549c72cb-f737-4ace-9b49-cedb0cbd70c7"),
-            os.environ.get("LANGFUSE_SECRET_KEY", "sk-lf-53fc113b-95e9-400a-ab8d-ad877ab03f67"),
-        )
+        runs = [r.name for r in (runs_res.data or [])]
+        print(f"    ℹ️ 通过 SDK 获取 {len(runs)} 个 run")
+        return runs
+    except Exception as e:
+        print(f"    ℹ️ SDK get_runs 失败: {type(e).__name__}: {e}，尝试 HTTP fallback...")
+    
+    # fallback: 用 HTTP
+    try:
         r = requests.get(
             f"{LANGFUSE_HOST}/api/public/datasets/{dataset_name}/runs",
-            auth=AUTH, params={"limit": 100}
+            auth=AUTH,  # 使用全局 AUTH（同第一部分拉 dataset 的凭证）
+            params={"limit": 100}
         )
-        return [x["name"] for x in r.json().get("data", [])] if r.ok else []
+        if r.ok:
+            runs = [x["name"] for x in r.json().get("data", [])]
+            print(f"    ℹ️ 通过 HTTP 获取 {len(runs)} 个 run")
+            return runs
+        else:
+            print(f"    ⚠️ HTTP 请求失败 (status={r.status_code}): {r.text[:200]}")
+            return []
+    except Exception as e:
+        print(f"    ⚠️ HTTP fallback 也失败: {type(e).__name__}: {e}")
+        return []
 
 
 # ===============================================================
@@ -144,6 +160,13 @@ def get_all_runs(dataset_name: str, specified_runs: list) -> list:
 
 def export_eval_report():
     all_rows = []
+    
+    if not TARGETS:
+        print("\n❌ TARGETS 为空！无 dataset 可处理。请检查:")
+        print("   1. LANGFUSE_HOST 是否可达")
+        print("   2. 凭证（PUBLIC_KEY / SECRET_KEY）是否正确")
+        print("   3. Langfuse 实例中是否存在 dataset")
+        return
 
     for dataset_name, run_names in TARGETS.items():
         run_names = get_all_runs(dataset_name, run_names)
