@@ -1,0 +1,2 @@
+[console_scripts]
+rl-server = tinker_atropos.rl_api_server:main

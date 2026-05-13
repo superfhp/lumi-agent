@@ -1,0 +1,40 @@
+==================================================
+📂 目录: /mnt/workspace/lumi-agent
+🌐 地址: http://localhost:9200
+📄 报告同源路径: /lumifinreport/<report.html>
+==================================================
+==================================================
+按 Ctrl+C 停止服务
+
+  [127.0.0.1] "GET / HTTP/1.1" 200 -
+  [127.0.0.1] "GET / HTTP/1.1" 200 -
+  [127.0.0.1] "GET / HTTP/1.1" 200 -
+  [127.0.0.1] "GET / HTTP/1.1" 200 -
+  [127.0.0.1] "GET / HTTP/1.1" 200 -
+
+服务已停止。
+==================================================
+📂 目录: /mnt/workspace/achieveFinReport
+🌐 地址: http://localhost:9200
+📄 报告同源路径: /lumifinreport/<report.html>
+==================================================
+   http://localhost:9200/lumifinreport/finEvalReport-20260512-195945.html
+   http://localhost:9200/lumifinreport/finEvalReport-20260512-213000.html
+   http://localhost:9200/lumifinreport/finEvalReport-20260512-215628.html
+   http://localhost:9200/lumifinreport/finEvalReport-20260512-221358.html
+==================================================
+按 Ctrl+C 停止服务
+
+Traceback (most recent call last):
+  File "/mnt/workspace/lumi-agent/serve.py", line 126, in <module>
+    main()
+  File "/mnt/workspace/lumi-agent/serve.py", line 118, in main
+    with http.server.HTTPServer(("", PORT), CustomHandler) as httpd:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 457, in __init__
+    self.server_bind()
+  File "/usr/lib/python3.12/http/server.py", line 136, in server_bind
+    socketserver.TCPServer.server_bind(self)
+  File "/usr/lib/python3.12/socketserver.py", line 473, in server_bind
+    self.socket.bind(self.server_address)
+OSError: [Errno 98] Address already in use
