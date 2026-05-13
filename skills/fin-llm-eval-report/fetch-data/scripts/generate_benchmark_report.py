@@ -33,14 +33,45 @@ lf = Langfuse(
 
 # ── 要提取的 dataset → run 列表，支持同一模型多个版本 ────────────
 # 留空列表表示"自动拉取该 dataset 下所有 run"
-TARGETS = {
-    "Fin-dataset-1": [
-        "claude-sonnet-4-6_20260428_nochoices_0.1_Fin-dataset-1",
-        "claude-sonnet-4-5_20260428_nochoices_0.1_Fin-dataset-1"
-    ]
-    # 可继续追加其他 dataset / run
-    # "CFA-Level2-2025": [],
-}
+def get_all_dataset_names() -> list:
+    """获取 Langfuse 中全部 dataset 名称（自动分页）"""
+    names = []
+    page = 1
+    limit = 100
+
+    while True:
+        resp = requests.get(
+            f"{LANGFUSE_HOST}/api/public/datasets",
+            auth=AUTH,
+            params={"page": page, "limit": limit},
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+        if not data:
+            break
+
+        names.extend([d.get("name") for d in data if d.get("name")])
+        if len(data) < limit:
+            break
+        page += 1
+
+    return names
+
+
+def build_targets_from_all_datasets() -> dict:
+    """通过 get_dataset() 获取全量 dataset，并构建 TARGETS（run 留空=自动拉取）"""
+    targets = {}
+    for dataset_name in get_all_dataset_names():
+        try:
+            # 用 get_dataset() 拉取完整 dataset 对象，确保该 dataset 可访问
+            ds = lf.get_dataset(dataset_name)
+            targets[getattr(ds, "name", dataset_name)] = []
+        except Exception as e:
+            print(f"⚠️ 跳过 dataset {dataset_name}（get_dataset失败）: {e}")
+    return targets
+
+
+TARGETS = build_targets_from_all_datasets()
 
 OUTPUT_FILE = "/mnt/workspace/data/val_FullReport.csv"
 
