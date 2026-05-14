@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 set -euo pipefail
 
 # Bootstrap Open WebUI against Hermes Agent's OpenAI-compatible API server.
