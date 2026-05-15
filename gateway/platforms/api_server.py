@@ -826,7 +826,8 @@ class APIServerAdapter(BasePlatformAdapter):
 
             config = load_config()
             disabled = get_disabled_skills(config)
-            skills = _find_all_skills(skip_disabled=False)
+            # Include disabled skills too, then annotate enabled state.
+            skills = _find_all_skills(skip_disabled=True)
             for skill in skills:
                 name = str(skill.get("name", ""))
                 skill["enabled"] = bool(name) and name not in disabled
@@ -862,21 +863,29 @@ class APIServerAdapter(BasePlatformAdapter):
             )
 
         try:
-            from hermes_cli.config import load_config
-            from hermes_cli.skills_config import get_disabled_skills, save_disabled_skills
+            from hermes_cli.config import get_config_path, read_raw_config
+            from hermes_cli.skills_config import get_disabled_skills
             from tools.skills_tool import _find_all_skills
+            from utils import atomic_yaml_write
 
-            skills = _find_all_skills(skip_disabled=False)
+            # Validate against all known skills (including disabled ones),
+            # otherwise re-enabling a disabled skill looks like "not found".
+            skills = _find_all_skills(skip_disabled=True)
             if not any(str(skill.get("name", "")).strip() == name for skill in skills):
                 return web.json_response(_openai_error(f"Skill not found: {name}"), status=404)
 
-            config = load_config()
+            # Use raw config + atomic write to avoid unrelated config-schema
+            # validation failures from blocking a simple skill toggle.
+            config = read_raw_config()
             disabled = get_disabled_skills(config)
             if enabled:
                 disabled.discard(name)
             else:
                 disabled.add(name)
-            save_disabled_skills(config, disabled)
+
+            config.setdefault("skills", {})
+            config["skills"]["disabled"] = sorted(disabled)
+            atomic_yaml_write(get_config_path(), config, sort_keys=False)
 
             return web.json_response({"ok": True, "name": name, "enabled": enabled})
         except Exception as e:
