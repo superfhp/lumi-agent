@@ -314,6 +314,8 @@ def _create_app(adapter: APIServerAdapter) -> web.Application:
     app.router.add_get("/health/detailed", adapter._handle_health_detailed)
     app.router.add_get("/v1/health", adapter._handle_health)
     app.router.add_get("/v1/models", adapter._handle_models)
+    app.router.add_get("/v1/hermes/skills", adapter._handle_skills)
+    app.router.add_put("/v1/hermes/skills/toggle", adapter._handle_skill_toggle)
     app.router.add_post("/v1/chat/completions", adapter._handle_chat_completions)
     app.router.add_post("/v1/responses", adapter._handle_responses)
     app.router.add_get("/v1/responses/{response_id}", adapter._handle_get_response)
@@ -489,6 +491,78 @@ class TestModelsEndpoint:
                 headers={"Authorization": "Bearer sk-secret"},
             )
             assert resp.status == 200
+
+
+# ---------------------------------------------------------------------------
+# /v1/hermes/skills endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestHermesSkillsEndpoint:
+    @pytest.mark.asyncio
+    async def test_skills_list_returns_enabled_state(self, auth_adapter):
+        app = _create_app(auth_adapter)
+        with patch("tools.skills_tool._find_all_skills", return_value=[{"name": "alpha", "description": "A skill"}]), patch(
+            "hermes_cli.config.load_config", return_value={}
+        ), patch(
+            "hermes_cli.skills_config.get_disabled_skills", return_value=set()
+        ):
+            async with TestClient(TestServer(app)) as cli:
+                resp = await cli.get(
+                    "/v1/hermes/skills",
+                    headers={"Authorization": "Bearer sk-secret"},
+                )
+                assert resp.status == 200
+                data = await resp.json()
+                assert data["object"] == "list"
+                assert data["data"][0]["name"] == "alpha"
+                assert data["data"][0]["enabled"] is True
+
+    @pytest.mark.asyncio
+    async def test_toggle_skill_updates_disabled_set(self, auth_adapter):
+        app = _create_app(auth_adapter)
+        config = {}
+        disabled = {"alpha"}
+        with patch("tools.skills_tool._find_all_skills", return_value=[{"name": "alpha", "description": "A skill"}]), patch(
+            "hermes_cli.config.load_config", return_value=config
+        ), patch(
+            "hermes_cli.skills_config.get_disabled_skills", return_value=disabled
+        ), patch(
+            "hermes_cli.skills_config.save_disabled_skills"
+        ) as save_disabled_skills:
+            async with TestClient(TestServer(app)) as cli:
+                resp = await cli.put(
+                    "/v1/hermes/skills/toggle",
+                    headers={"Authorization": "Bearer sk-secret"},
+                    json={"name": "alpha", "enabled": True},
+                )
+                assert resp.status == 200
+                data = await resp.json()
+                assert data == {"ok": True, "name": "alpha", "enabled": True}
+                save_disabled_skills.assert_called_once()
+                assert save_disabled_skills.call_args.args[0] is config
+                assert save_disabled_skills.call_args.args[1] == set()
+
+    @pytest.mark.asyncio
+    async def test_toggle_skill_returns_404_for_unknown_skill(self, auth_adapter):
+        app = _create_app(auth_adapter)
+        with patch("tools.skills_tool._find_all_skills", return_value=[]), patch(
+            "hermes_cli.config.load_config", return_value={}
+        ), patch(
+            "hermes_cli.skills_config.get_disabled_skills", return_value=set()
+        ), patch(
+            "hermes_cli.skills_config.save_disabled_skills"
+        ) as save_disabled_skills:
+            async with TestClient(TestServer(app)) as cli:
+                resp = await cli.put(
+                    "/v1/hermes/skills/toggle",
+                    headers={"Authorization": "Bearer sk-secret"},
+                    json={"name": "missing-skill", "enabled": False},
+                )
+                assert resp.status == 404
+                data = await resp.json()
+                assert "Skill not found" in data["error"]["message"]
+                save_disabled_skills.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

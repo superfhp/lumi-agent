@@ -836,6 +836,53 @@ class APIServerAdapter(BasePlatformAdapter):
             logger.exception("Failed to list Hermes skills via API server")
             return web.json_response(_openai_error(f"Failed to list skills: {e}"), status=500)
 
+    async def _handle_skill_toggle(self, request: "web.Request") -> "web.Response":
+        """PUT /v1/hermes/skills/toggle — enable or disable a Hermes skill."""
+        auth_err = self._check_auth(request)
+        if auth_err:
+            return auth_err
+
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, Exception):
+            return web.json_response(_openai_error("Invalid JSON in request body"), status=400)
+
+        name = str(body.get("name", "")).strip()
+        if not name:
+            return web.json_response(
+                _openai_error("Missing required field 'name'"),
+                status=400,
+            )
+
+        enabled = body.get("enabled", None)
+        if not isinstance(enabled, bool):
+            return web.json_response(
+                _openai_error("Missing or invalid required field 'enabled'"),
+                status=400,
+            )
+
+        try:
+            from hermes_cli.config import load_config
+            from hermes_cli.skills_config import get_disabled_skills, save_disabled_skills
+            from tools.skills_tool import _find_all_skills
+
+            skills = _find_all_skills(skip_disabled=False)
+            if not any(str(skill.get("name", "")).strip() == name for skill in skills):
+                return web.json_response(_openai_error(f"Skill not found: {name}"), status=404)
+
+            config = load_config()
+            disabled = get_disabled_skills(config)
+            if enabled:
+                disabled.discard(name)
+            else:
+                disabled.add(name)
+            save_disabled_skills(config, disabled)
+
+            return web.json_response({"ok": True, "name": name, "enabled": enabled})
+        except Exception as e:
+            logger.exception("Failed to toggle Hermes skill via API server")
+            return web.json_response(_openai_error(f"Failed to toggle skill: {e}"), status=500)
+
     async def _handle_chat_completions(self, request: "web.Request") -> "web.Response":
         """POST /v1/chat/completions — OpenAI Chat Completions format."""
         auth_err = self._check_auth(request)
@@ -2650,6 +2697,7 @@ class APIServerAdapter(BasePlatformAdapter):
             self._app.router.add_get("/v1/health", self._handle_health)
             self._app.router.add_get("/v1/models", self._handle_models)
             self._app.router.add_get("/v1/hermes/skills", self._handle_skills)
+            self._app.router.add_put("/v1/hermes/skills/toggle", self._handle_skill_toggle)
             self._app.router.add_post("/v1/chat/completions", self._handle_chat_completions)
             self._app.router.add_post("/v1/responses", self._handle_responses)
             self._app.router.add_get("/v1/responses/{response_id}", self._handle_get_response)

@@ -184,16 +184,35 @@ write_launcher() {
 #!/usr/bin/env bash
 set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-API_KEY=\$(python3 - <<'PY'
+
+# Read API key from env file with validation
+API_KEY=\$(python3 - ${quoted_hermes_env} <<'PY'
 from pathlib import Path
-p = Path.home()/'.hermes'/'.env'
+import sys
+env_file = sys.argv[1]
+p = Path(env_file)
+if not p.exists():
+    print("ERROR: .env file not found: " + env_file, file=sys.stderr)
+    sys.exit(1)
 for raw in p.read_text().splitlines():
     line = raw.strip()
+    if not line or line.startswith('#'):
+        continue
     if line.startswith('API_SERVER_KEY='):
-        print(line.split('=', 1)[1])
-        break
+        value = line.split('=', 1)[1].strip().strip('"').strip("'")
+        if not value:
+            print("ERROR: API_SERVER_KEY is empty in .env", file=sys.stderr)
+            sys.exit(1)
+        print(value)
+        sys.exit(0)
+print("ERROR: API_SERVER_KEY not found in .env", file=sys.stderr)
+sys.exit(1)
 PY
-)
+) || {
+  echo "[open-webui] Failed to read API_SERVER_KEY from ${quoted_hermes_env}" >&2
+  exit 1
+}
+
 export DATA_DIR=${quoted_data_dir}
 export WEBUI_NAME=${quoted_name}
 export ENABLE_SIGNUP=${OPEN_WEBUI_ENABLE_SIGNUP}
