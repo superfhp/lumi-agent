@@ -214,6 +214,14 @@ student_client = OpenAI(
     base_url="http://47.99.95.132:11434/v1",
     timeout=100
 )
+
+EVAL_DATASETS = [
+    "Fin-dataset-1"
+]
+
+UNIFIED_SYS_PROMPT = "你是一个专业的量化金融分析师。请严格使用【第一步：提取已知量】、【第二步：选择公式】、【第三步：计算】的结构化思维链（Chain of Thought）进行推演。格式必须清晰，最后输出 '最终答案：X'。"
+
+
 MODELS_CONFIG = [
     {
         "model_id": "qwen3.5:9b",
@@ -279,12 +287,6 @@ def judge_reasoning(question_text, official_explanation, student_reasoning):
         return 0.0, f"判分失败: {str(e)}"
 
 # ================= 3. 核心评测逻辑 =================
-EVAL_DATASETS = [
-    "Fin-dataset-1"
-]
-
-UNIFIED_SYS_PROMPT = "你是一个专业的量化金融分析师。请严格使用【第一步：提取已知量】、【第二步：选择公式】、【第三步：计算】的结构化思维链（Chain of Thought）进行推演。格式必须清晰，最后输出 '最终答案：X'。"
-
 
 
 MAX_CONCURRENT_WORKERS = 10
