@@ -211,7 +211,7 @@ def create_compat_trace(client, name, session_id, input_payload, metadata, tags=
 
 student_client = OpenAI(
     api_key="sk-67737e76fa2a42319d00f68d67e2ca64",
-    base_url="http://localhost:11434/v1",
+    base_url="http://47.99.95.132:11434/v1",
     timeout=100
 )
 
