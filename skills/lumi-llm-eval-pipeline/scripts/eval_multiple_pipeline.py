@@ -5,7 +5,6 @@ import time
 import sys
 import argparse
 from langfuse import Langfuse
-from lumi import Lumi
 from openai import OpenAI
 import concurrent.futures # 🌟 引入并发库
 
@@ -38,7 +37,7 @@ os.environ["LUMI_PUBLIC_KEY"] = LUMI_PUBLIC_KEY
 os.environ["LUMI_SECRET_KEY"] = LUMI_SECRET_KEY
 os.environ["LUMI_HOST"] = LUMI_BASE_URL 
 
-lumi_client = Lumi(
+lumi_client = Langfuse(
     public_key=LUMI_PUBLIC_KEY,
     secret_key=LUMI_SECRET_KEY,
     host=LUMI_BASE_URL,
