@@ -396,7 +396,7 @@ def evaluate_single_question(item, dataset_name, model_config, run_name, q_index
             messages=messages_to_llm,
             temperature=current_temp,
             stream=True,
-            extra_body={"thinking": {"type": "disabled"}}  # 🌟 禁用 thinking 模式以提升效率,
+            #extra_body={"thinking": {"type": "disabled"}}  # 🌟 禁用 thinking 模式以提升效率,
             stream_options={"include_usage": True}
 
         )
