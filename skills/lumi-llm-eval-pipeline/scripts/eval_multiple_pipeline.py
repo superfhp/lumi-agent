@@ -210,8 +210,8 @@ def create_compat_trace(client, name, session_id, input_payload, metadata, tags=
     return _CompatTrace(client=client, root_span=root_span, root_ctx=root_ctx, trace_id=trace_id)
 
 student_client = OpenAI(
-    api_key="sk-67737e76fa2a42319d00f68d67e2ca64",
-    base_url="http://47.99.95.132:11434/v1",
+    api_key="sk-eModH1YZpV9YVdvc1WLA5mEvwFYbEkrKbSJq0TUbxWKe2y1K",
+    base_url="https://gateway.zerail.com/v1",
     timeout=100
 )
 
@@ -224,8 +224,8 @@ UNIFIED_SYS_PROMPT = "你是一个专业的量化金融分析师。请严格使�
 
 MODELS_CONFIG = [
     {
-        "model_id": "qwen3.5:9b",
-        "run_prefix": "qwen3.5:9b_0.1_round_test_hpfu",
+        "model_id": "gpt-5.2",
+        "run_prefix": "gpt-5.2_0.1_round_test_hpfu",
         "temperature": 0.1,
         "sys_prompt": UNIFIED_SYS_PROMPT
     }
