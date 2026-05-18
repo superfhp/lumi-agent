@@ -30,9 +30,9 @@ import concurrent.futures # 🌟 引入并发库
 #     secret_key="sk-lf-7e1eb50d-9c83-4c8e-9c9a-ad2cedd6b656", # B 的 Secret Key
 #     host="http://localhost:3000" 
 # )
-LUMI_SECRET_KEY="sk-lf-c3dd7903-0c39-4faf-bec9-c4e9448b105a"
-LUMI_PUBLIC_KEY="pk-lf-6c9a9751-70cc-4def-b650-533e176374a9"
-LUMI_BASE_URL="http://172.16.217.161:3000"
+LUMI_SECRET_KEY="sk-lf-24f65774-ec0c-4490-bd7f-6cf9635f1d4e"
+LUMI_PUBLIC_KEY="pk-lf-ae40d3e8-0b00-4412-9734-c90b2cd77e49"
+LUMI_BASE_URL="http://172.16.217.163:3000"
 os.environ["LUMI_PUBLIC_KEY"] = LUMI_PUBLIC_KEY
 os.environ["LUMI_SECRET_KEY"] = LUMI_SECRET_KEY
 os.environ["LUMI_HOST"] = LUMI_BASE_URL 
@@ -41,15 +41,177 @@ lumi_client = Langfuse(
     public_key=LUMI_PUBLIC_KEY,
     secret_key=LUMI_SECRET_KEY,
     host=LUMI_BASE_URL,
-    timeout=120, 
-    # 开启后台异步重试
-    max_retries=3 
+    timeout=120
 )
+
+
+class _CompatGeneration:
+    def __init__(self, generation_obj):
+        self._generation = generation_obj
+
+    def end(self, output=None, usage=None, metadata=None, level=None, status_message=None):
+        if self._generation is None:
+            return
+
+        update_kwargs = {}
+        metadata_payload = dict(metadata or {})
+        if usage:
+            metadata_payload["usage"] = usage
+        if level:
+            metadata_payload["level"] = level
+        if status_message:
+            metadata_payload["status_message"] = status_message
+
+        if output is not None:
+            update_kwargs["output"] = output
+        if metadata_payload:
+            update_kwargs["metadata"] = metadata_payload
+
+        try:
+            if update_kwargs and hasattr(self._generation, "update"):
+                self._generation.update(**update_kwargs)
+            if hasattr(self._generation, "end"):
+                self._generation.end()
+        except Exception as e:
+            print(f"      [Langfuse generation.end 兼容层异常]: {e}")
+
+
+class _CompatTrace:
+    def __init__(self, client, trace_obj=None, root_span=None, root_ctx=None, trace_id=None):
+        self._client = client
+        self._trace = trace_obj
+        self._root_span = root_span
+        self._root_ctx = root_ctx
+        self.trace_id = trace_id
+
+    def generation(self, name, model, input):
+        # 旧版 SDK
+        if self._trace is not None and hasattr(self._trace, "generation"):
+            try:
+                return self._trace.generation(name=name, model=model, input=input)
+            except Exception as e:
+                print(f"      [Langfuse trace.generation 异常]: {e}")
+
+        # 新版 SDK
+        if self._root_span is not None and hasattr(self._root_span, "start_observation"):
+            try:
+                gen_obj = self._root_span.start_observation(
+                    name=name,
+                    as_type="generation",
+                    input=input,
+                    model=model,
+                    metadata={},
+                )
+                return _CompatGeneration(gen_obj)
+            except Exception as e:
+                print(f"      [Langfuse start_observation 异常]: {e}")
+
+        return _CompatGeneration(None)
+
+    def score(self, name, value, comment=""):
+        # 旧版 SDK
+        if self._trace is not None and hasattr(self._trace, "score"):
+            try:
+                return self._trace.score(name=name, value=value, comment=comment)
+            except Exception:
+                pass
+
+        # 新版 SDK（尽力兼容不同方法名）
+        for method_name in ("score", "create_score"):
+            method = getattr(self._client, method_name, None)
+            if method is None:
+                continue
+            try:
+                kwargs = {"name": name, "value": value, "comment": comment}
+                if self.trace_id:
+                    kwargs["trace_id"] = self.trace_id
+                return method(**kwargs)
+            except Exception:
+                continue
+
+    def update(self, output=None, usage=None, level=None):
+        # 旧版 SDK
+        if self._trace is not None and hasattr(self._trace, "update"):
+            try:
+                kwargs = {}
+                if output is not None:
+                    kwargs["output"] = output
+                if usage is not None:
+                    kwargs["usage"] = usage
+                if level is not None:
+                    kwargs["level"] = level
+                if kwargs:
+                    return self._trace.update(**kwargs)
+                return
+            except Exception:
+                pass
+
+        # 新版 SDK
+        if self._root_span is not None and hasattr(self._root_span, "update"):
+            try:
+                kwargs = {}
+                metadata = {}
+                if usage is not None:
+                    metadata["usage"] = usage
+                if level is not None:
+                    metadata["level"] = level
+                if output is not None:
+                    kwargs["output"] = output
+                if metadata:
+                    kwargs["metadata"] = metadata
+                if kwargs:
+                    self._root_span.update(**kwargs)
+            except Exception as e:
+                print(f"      [Langfuse trace.update 兼容层异常]: {e}")
+
+    def close(self):
+        if self._root_ctx is not None:
+            try:
+                self._root_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
+
+
+def create_compat_trace(client, name, session_id, input_payload, metadata, tags=None):
+    # 旧版 SDK
+    if hasattr(client, "trace"):
+        trace_obj = client.trace(
+            name=name,
+            session_id=session_id,
+            input=input_payload,
+            metadata=metadata,
+            tags=tags or [],
+        )
+        return _CompatTrace(client=client, trace_obj=trace_obj)
+
+    # 新版 SDK
+    trace_id = None
+    if hasattr(client, "create_trace_id"):
+        try:
+            trace_id = client.create_trace_id(seed=f"{session_id}::{name}")
+        except Exception:
+            trace_id = None
+
+    trace_context = {}
+    if trace_id:
+        trace_context["trace_id"] = trace_id
+    if session_id:
+        trace_context["session_id"] = session_id
+
+    root_ctx = client.start_as_current_observation(
+        trace_context=trace_context or None,
+        name=name,
+        as_type="chain",
+        input=input_payload,
+        metadata={**(metadata or {}), "tags": tags or []},
+        end_on_exit=False,
+    )
+    root_span = root_ctx.__enter__()
+    return _CompatTrace(client=client, root_span=root_span, root_ctx=root_ctx, trace_id=trace_id)
 
 student_client = OpenAI(
     api_key="sk-67737e76fa2a42319d00f68d67e2ca64",
     base_url="http://localhost:11434/v1",
-    model="qwen3.5:9b",
     timeout=100
 )
 
@@ -170,12 +332,13 @@ def evaluate_single_question(item, dataset_name, model_config, run_name, q_index
     }
 
     # 创建独立的 Trace，并在初始化时就上报 input
-    trace = lumi_client.trace(
+    trace = create_compat_trace(
+        client=lumi_client,
         name="Fin_Gradient_Test",
-        session_id=run_name, 
-        input=trace_input,
-        metadata=trace_metadata, 
-        tags=[model_name, dataset_name, f"Temp_{current_temp}"] 
+        session_id=run_name,
+        input_payload=trace_input,
+        metadata=trace_metadata,
+        tags=[model_name, dataset_name, f"Temp_{current_temp}"],
     )
     
     messages_to_llm = [
@@ -204,7 +367,7 @@ def evaluate_single_question(item, dataset_name, model_config, run_name, q_index
         # 为了防止多线程瞬间打爆 API，可以引入微小的随机抖动 (Jitter)
         # time.sleep(random.uniform(0.1, 0.5)) 
         
-        response_stream = llm_client.chat.completions.create(
+        response_stream = student_client.chat.completions.create(
             model=model_name,
             messages=messages_to_llm,
             temperature=current_temp,
@@ -315,7 +478,15 @@ def evaluate_single_question(item, dataset_name, model_config, run_name, q_index
         )
         
         
-        item.link(trace, run_name)
+        try:
+            item.link(trace, run_name)
+        except Exception:
+            # 某些 SDK 版本要求传 trace_id；若都不支持则忽略，不影响主流程
+            try:
+                if getattr(trace, "trace_id", None):
+                    item.link(trace.trace_id, run_name)
+            except Exception:
+                pass
         
         # 多线程打印容易乱序，用统一的格式输出
         status = "✅" if accuracy_score == 1.0 else "❌"
@@ -330,6 +501,8 @@ def evaluate_single_question(item, dataset_name, model_config, run_name, q_index
         generation.end(level="ERROR", status_message=str(e))
         trace.update(level="ERROR")
         return f"[{q_index}/{total_items}] 题号 {q_num} | ⚠️ 异常失败: {str(e)[:300]}"
+    finally:
+        trace.close()
 
 # ================= 3. 线程池分发引擎 =================
 def run_evaluation_for_model_concurrent(dataset_name: str, model_config: dict, round_num: int = 1, start_question_index: int = 0):
