@@ -214,6 +214,15 @@ student_client = OpenAI(
     base_url="http://47.99.95.132:11434/v1",
     timeout=100
 )
+MODELS_CONFIG = [
+    {
+        "model_id": "qwen3.5:9b",
+        "run_prefix": "qwen3.5:9b_0.1_round1",
+        "temperature": 0.1,
+        "sys_prompt": UNIFIED_SYS_PROMPT
+    }
+]
+
 
 # 专用于阅卷的裁判客户端（这里复用 DashScope，强制使用 qwen-max 保证判分客观性）
 JUDGE_MODEL = "claude-sonnet-4-6"
@@ -276,14 +285,7 @@ EVAL_DATASETS = [
 
 UNIFIED_SYS_PROMPT = "你是一个专业的量化金融分析师。请严格使用【第一步：提取已知量】、【第二步：选择公式】、【第三步：计算】的结构化思维链（Chain of Thought）进行推演。格式必须清晰，最后输出 '最终答案：X'。"
 
-MODELS_CONFIG = [
-    {
-        "model_id": "qwen2.5:32b",
-        "run_prefix": "qwen2.5:32b_0.1_round1",
-        "temperature": 0.1,
-        "sys_prompt": UNIFIED_SYS_PROMPT
-    }
-]
+
 
 MAX_CONCURRENT_WORKERS = 10
 
