@@ -20,9 +20,9 @@ from langfuse import Langfuse
 # ===============================================================
 # 1. 配置
 # ===============================================================
-LANGFUSE_HOST = os.environ.get("LANGFUSE_HOST", "http://172.16.217.161:3000")
-LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "pk-lf-6c9a9751-70cc-4def-b650-533e176374a9")
-LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "sk-lf-c3dd7903-0c39-4faf-bec9-c4e9448b105a")
+LANGFUSE_HOST = os.environ.get("LANGFUSE_HOST", "http://172.16.217.163:3000")
+LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "pk-lf-ae40d3e8-0b00-4412-9734-c90b2cd77e49")
+LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "sk-lf-24f65774-ec0c-4490-bd7f-6cf9635f1d4e")
 AUTH = HTTPBasicAuth(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)
 
 lf = Langfuse(

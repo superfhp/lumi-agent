@@ -8,11 +8,19 @@
 import http.server
 import sys
 import webbrowser
+import urllib.parse
+import os
 from pathlib import Path
 
 PORT = 9200
-BASE_DIR = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).parent.resolve()
+BASE_DIR = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path("/mnt/workspace/achieveFinReport").resolve()
 REPORT_PREFIX = "/lumifinreport"
+DOWNLOAD_PREFIX = "/download"
+# 允许下载的目录白名单，文件必须在其中之一下才可访问
+DOWNLOAD_ROOTS = [
+    Path("/mnt/workspace"),
+    Path("/hpfu/media_data"),
+]
 
 
 def list_html_files():
@@ -65,6 +73,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._serve_prefixed_static("GET")
             return
 
+        if path.startswith(f"{DOWNLOAD_PREFIX}/"):
+            self._serve_download()
+            return
+
         super().do_GET()
 
     def do_HEAD(self):
@@ -74,6 +86,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
         if path.startswith(f"{REPORT_PREFIX}/"):
             self._serve_prefixed_static("HEAD")
+            return
+        if path.startswith(f"{DOWNLOAD_PREFIX}/"):
+            self._serve_download(head_only=True)
             return
         super().do_HEAD()
 
@@ -98,15 +113,88 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             self.path = original_path
 
+    def _serve_download(self, head_only: bool = False):
+        """提供 /download/<path> 文件下载，自动附加 Content-Disposition"""
+        raw_path = self.path.split("?")[0]
+        rel = raw_path[len(DOWNLOAD_PREFIX):]
+        rel = urllib.parse.unquote(rel).lstrip("/")
+        
+        # 在白名单中查找匹配的根目录
+        file_path = None
+        for root in DOWNLOAD_ROOTS:
+            candidate = (root / rel).resolve()
+            if str(candidate).startswith(str(root)) and candidate.exists():
+                file_path = candidate
+                break
+        
+        # 未匹配到任何白名单目录，尝试当作绝对路径（仍需在白名单内）
+        if file_path is None:
+            abs_candidate = Path("/" + rel).resolve()
+            for root in DOWNLOAD_ROOTS:
+                if str(abs_candidate).startswith(str(root)) and abs_candidate.exists():
+                    file_path = abs_candidate
+                    break
+        
+        if file_path is None:
+            self.send_error(404, f"File not found or not in allowed paths: {rel}")
+            return
+        
+        if file_path.is_dir():
+            # 目录：列出文件
+            items = sorted(file_path.iterdir())
+            links = "".join(
+                f'<li><a href="{DOWNLOAD_PREFIX}/{rel.rstrip("/")}/{f.name}{"/" if f.is_dir() else ""}">'
+                f'{"📁 " if f.is_dir() else "📄 "}{f.name}</a></li>'
+                for f in items
+            )
+            content = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>下载目录</title>
+<style>
+body {{ font-family: -apple-system, sans-serif; background: #0f1419; color: #e0e0e0;
+       max-width: 700px; margin: 40px auto; padding: 0 20px; }}
+h2 {{ color: #fff; }} ul {{ list-style: none; padding: 0; }}
+li a {{ display: block; padding: 10px 14px; margin: 4px 0; border-radius: 6px;
+       background: #1a1f2e; border: 1px solid #2a3038; color: #71a6ff; text-decoration: none; }}
+li a:hover {{ background: #252d3d; border-color: #3b82f6; }}
+</style></head>
+<body><h2>📂 /{rel or "."}</h2><ul>{links or "<li>（空目录）</li>"}</ul></body></html>""".encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            if not head_only:
+                self.wfile.write(content)
+            return
+        
+        # 文件：强制下载
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+        except Exception as e:
+            self.send_error(500, str(e))
+            return
+        
+        filename = file_path.name
+        encoded_name = urllib.parse.quote(filename)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{encoded_name}")
+        self.end_headers()
+        if not head_only:
+            self.wfile.write(data)
+
     def log_message(self, format, *args):
         print(f"  [{self.address_string()}] {format % args}")
 
 
 def main():
     print("=" * 50)
-    print(f"📂 目录: {BASE_DIR}")
+    print(f"📂 报告目录: {BASE_DIR}")
+    print(f"📥 下载白名单: {[str(r) for r in DOWNLOAD_ROOTS]}")
     print(f"🌐 地址: http://localhost:{PORT}")
-    print(f"📄 报告同源路径: {REPORT_PREFIX}/<report.html>")
+    print(f"📄 报告路径: {REPORT_PREFIX}/<report.html>")
+    print(f"📥 下载路径: {DOWNLOAD_PREFIX}/<relative_path>")
     print("=" * 50)
     for f in list_html_files():
         print(f"   http://localhost:{PORT}{REPORT_PREFIX}/{f.name}")
