@@ -1,0 +1,22 @@
+{
+  "experiment_name": "common_rvec_pack_2shot",
+  "tags": [
+    "common",
+    "rvec",
+    "prompt-pack",
+    "trial"
+  ],
+  "dataset": "common-dataset-v3",
+  "total_rows": 4,
+  "groups": [
+    {
+      "model": "deepseek-v4-flash",
+      "run_prefix": "ds_v4_flash",
+      "round": 1,
+      "n": 4,
+      "errors": 0,
+      "custom_rvec_mean": 0.125,
+      "custom_rvec_std": 0.2165
+    }
+  ]
+}

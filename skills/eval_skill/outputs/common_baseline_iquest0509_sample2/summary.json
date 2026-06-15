@@ -1,0 +1,22 @@
+{
+  "experiment_name": "common_baseline_iquest0509_sample2",
+  "tags": [
+    "common",
+    "rvec",
+    "baseline-only",
+    "sample2"
+  ],
+  "dataset": "common-dataset-v3",
+  "total_rows": 2,
+  "groups": [
+    {
+      "model": "iquest-0509",
+      "run_prefix": "baseline",
+      "round": 1,
+      "n": 2,
+      "errors": 2,
+      "general_rvec_mean": 0.0,
+      "general_rvec_std": 0.0
+    }
+  ]
+}

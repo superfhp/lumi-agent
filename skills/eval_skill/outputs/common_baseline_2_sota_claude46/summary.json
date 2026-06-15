@@ -1,0 +1,21 @@
+{
+  "experiment_name": "common_baseline_2_sota_claude46",
+  "tags": [
+    "common",
+    "sample2",
+    "baseline_only"
+  ],
+  "dataset": "common-dataset-v3",
+  "total_rows": 2,
+  "groups": [
+    {
+      "model": "general-0525",
+      "run_prefix": "baseline",
+      "round": 1,
+      "n": 2,
+      "errors": 2,
+      "general_rvec_mean": 0.0,
+      "general_rvec_std": 0.0
+    }
+  ]
+}

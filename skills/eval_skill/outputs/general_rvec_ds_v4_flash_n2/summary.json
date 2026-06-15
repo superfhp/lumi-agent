@@ -1,0 +1,39 @@
+{
+  "experiment_name": "general_rvec_ds_v4_flash_n2",
+  "tags": [
+    "general",
+    "rvec",
+    "subjective"
+  ],
+  "dataset": "common-dataset-v3",
+  "total_rows": 27,
+  "groups": [
+    {
+      "model": "claude-sonnet-4",
+      "run_prefix": "mut",
+      "round": 1,
+      "n": 2,
+      "errors": 2,
+      "general_rvec_mean": 0.0,
+      "general_rvec_std": 0.0
+    },
+    {
+      "model": "kimi-k2.6",
+      "run_prefix": "kimi",
+      "round": 1,
+      "n": 4,
+      "errors": 4,
+      "general_rvec_mean": 0.0,
+      "general_rvec_std": 0.0
+    },
+    {
+      "model": "deepseek-v4-flash",
+      "run_prefix": "mut",
+      "round": 1,
+      "n": 21,
+      "errors": 0,
+      "general_rvec_mean": 0.369,
+      "general_rvec_std": 0.3215
+    }
+  ]
+}

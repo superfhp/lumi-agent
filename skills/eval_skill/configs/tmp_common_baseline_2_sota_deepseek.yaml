@@ -1,0 +1,36 @@
+experiment_name: common_baseline_2_sota_deepseek_v4_flash
+
+tags: [common, sampling2, baseline_only]
+
+dataset:
+  name: common-dataset-v3
+
+sampling:
+  mode: n
+  n: 2
+  seed: 42
+
+prompt_strategy:
+  user_template: |
+    {question}
+
+model_under_test:
+  host_profile: sota
+  model: deepseek-v4-flash
+  run_prefix: baseline_only
+
+judge:
+  host_profile: sota
+  model: claude-sonnet-4-6
+  temperature: 0.1
+
+metrics:
+  - name: rvec_judge
+    alias: general_rvec
+    prompt_pack: prompts/judge/rvec_general
+
+execution:
+  rounds: 1
+  concurrency: 3
+  reporter: [csv]
+  resume: true

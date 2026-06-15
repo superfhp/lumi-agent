@@ -1,0 +1,21 @@
+{
+  "experiment_name": "common_trial_ds_v4_flash_3shot",
+  "tags": [
+    "general",
+    "rvec",
+    "subjective"
+  ],
+  "dataset": "common-dataset-v3",
+  "total_rows": 3,
+  "groups": [
+    {
+      "model": "deepseek-v4-flash",
+      "run_prefix": "mut",
+      "round": 1,
+      "n": 3,
+      "errors": 0,
+      "general_rvec_mean": 0.6667,
+      "general_rvec_std": 0.1559
+    }
+  ]
+}

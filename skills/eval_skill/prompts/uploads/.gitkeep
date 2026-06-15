@@ -1,0 +1,3 @@
+# 用户上传的 prompt 文件
+# 子目录按 kind 组织：system / judge / user_template
+# 由 `python -m eval_skill.cli upload-prompt` 维护

@@ -1,0 +1,36 @@
+experiment_name: common_baseline_iquest_sample2
+
+tags: [common, sample2, baseline_only]
+
+dataset:
+  name: common-dataset-v3
+
+sampling:
+  mode: n
+  n: 2
+
+prompt_strategy:
+  system_prompt_ref: prompts/system/general_default.txt
+  user_template: |
+    {prompt}
+
+model_under_test:
+  host_profile: sft_zhuoguang/iquest
+  model: sft-general-0509
+  run_prefix: baseline
+
+judge:
+  host_profile: iquest
+  model: claude-sonnet-4-6
+  temperature: 0.1
+
+metrics:
+  - name: rvec_judge
+    alias: general_rvec
+    prompt_pack: prompts/judge/rvec_general
+
+execution:
+  rounds: 1
+  concurrency: 3
+  reporter: [csv]
+  resume: true

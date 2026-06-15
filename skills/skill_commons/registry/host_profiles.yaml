@@ -1,0 +1,19 @@
+# host_profiles：host 信息与业务解耦。Agent 不要把 api_key 写进任何业务 yaml。
+#
+# 字段值支持 ${ENV_VAR} 与 ${ENV_VAR:default} 占位（首次加载时自动 load .env）。
+# 推荐：把 *_API_KEY / LUMI_* 都放在 skill_commons/.env 里（详见 .env.example）。
+# zerail:
+#   api_key: ${ZERAIL_API_KEY}
+#   base_url: ${ZERAIL_BASE_URL:https://gateway.zerail.com/v1}
+#   timeout: 300
+
+sota:
+  api_key: ${IQUEST_API_KEY}
+  base_url: ${IQUEST_BASE_URL:http://iqeust-litellm.danbo-agidata-inner.com/v1}
+  timeout: 300
+
+iquest:
+  api_key: ${SFT_ZHUOGUANG_API_KEY:EMPTY}
+  base_url: ${SFT_ZHUOGUANG_BASE_URL:https://siflow-zhuoguang.siflow.cn/siflow/zhuoguang/skyinfer/cmu/iquest-general-math4-0525/v1}
+  timeout: 300
+

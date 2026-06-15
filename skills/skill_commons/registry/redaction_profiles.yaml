@@ -1,0 +1,10 @@
+# 脱敏配置：keyword → replacement
+# 用法：在业务 yaml 的 preprocess.pdf.redaction_profile / 类似字段中引用 profile 名。
+
+finance_company_neutral:
+  "工商银行": "[公司A]"
+  "招商银行": "[公司B]"
+  "建设银行": "[公司C]"
+
+empty:
+  {}

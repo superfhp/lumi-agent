@@ -1,0 +1,37 @@
+experiment_name: common_baseline_sft_general_0509_sample2
+tags: [common, rvec, baseline_only, sample2]
+description: "common-dataset-v3 baseline-only 2-sample RVEC eval"
+
+dataset:
+  name: common-dataset-v3
+
+sampling:
+  mode: n
+  n: 2
+
+prompt_strategy:
+  user_template: |
+    {question}
+
+model_under_test:
+  host_profile: iquest
+  model: sft-general-0509
+  run_prefix: baseline_only
+
+baselines: []
+
+judge:
+  host_profile: zerail
+  model: claude-sonnet-4-6
+  temperature: 0.1
+
+metrics:
+  - name: rvec_judge
+    alias: general_rvec
+    prompt_pack: prompts/judge/rvec_general
+
+execution:
+  rounds: 1
+  concurrency: 3
+  reporter: [csv]
+  resume: true

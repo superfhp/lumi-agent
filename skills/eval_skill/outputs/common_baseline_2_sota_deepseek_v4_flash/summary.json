@@ -1,0 +1,21 @@
+{
+  "experiment_name": "common_baseline_2_sota_deepseek_v4_flash",
+  "tags": [
+    "common",
+    "sampling2",
+    "baseline_only"
+  ],
+  "dataset": "common-dataset-v3",
+  "total_rows": 4,
+  "groups": [
+    {
+      "model": "deepseek-v4-flash",
+      "run_prefix": "baseline_only",
+      "round": 1,
+      "n": 4,
+      "errors": 0,
+      "general_rvec_mean": 0.4375,
+      "general_rvec_std": 0.1875
+    }
+  ]
+}
