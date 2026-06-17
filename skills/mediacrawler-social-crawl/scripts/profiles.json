@@ -1,0 +1,23 @@
+{
+    "_comment": "仅 CDP 模式平台 (xhs, dy, ks) 需要配置。wb/bili/tieba/zhihu 走 Playwright + cookie 模式，配置在 cookies.json。",
+    "chrome_path": "/usr/bin/google-chrome",
+    "profile_base": "/mnt/workspace/chrome-profiles",
+    "platforms": {
+      "xhs": {
+        "cdp_port": 9222,
+        "profile_dir": "xhs",
+        "display": ":99"
+      },
+      "dy": {
+        "cdp_port": 9225,
+        "profile_dir": "dy",
+        "display": ":99"
+      },
+      "ks": {
+        "cdp_port": 9226,
+        "profile_dir": "ks",
+        "display": ":99"
+      }
+    }
+  }
+  

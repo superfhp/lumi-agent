@@ -1,0 +1,8 @@
+{
+    "_comment": "仅 Playwright 模式平台需要配置 cookie。xhs/dy/ks 走 CDP 模式，无需 cookie。",
+    "wb": "",
+    "bili": "",
+    "tieba": "",
+    "zhihu": ""
+  }
+  
