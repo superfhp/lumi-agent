@@ -1,13 +1,13 @@
 ---
 name: file-delivery
-description: 当用户要求下载文件、导出结果、获取生成的文件时使用此 skill。通过 HTTP 链接提供文件下载。
-version: 2.0.0
+description: 当用户要求下载文件、导出结果、获取生成的文件时使用此 skill。通过 HTTP 链接提供文件下载和预览。
+version: 2.1.0
 author: hpfu
 license: MIT
 platforms: [linux, macos]
 metadata:
   hermes:
-    tags: [file, download, delivery, utility]
+    tags: [file, download, delivery, preview, utility]
     category: utility
 ---
 
@@ -64,6 +64,7 @@ metadata:
 |--------|------|
 | `/mnt/workspace` | 工作空间，评测数据、报告等 |
 | `/hpfu/media_data` | 共享媒体数据挂载 |
+| `/hpfu/medical_data` | 医疗数据目录 |
 
 文件必须位于以上目录之下，否则 serve.py 会返回 403。
 
@@ -72,9 +73,12 @@ metadata:
 | 项目 | 值 |
 |------|------|
 | 服务脚本 | `/mnt/workspace/file-delivery/serve.py` |
-| 服务端口 | 9200（与报告展示共用） |
+| 服务端口 | 9200（与报告展示共用，支持环境变量 `SERVE_PORT` 覆盖） |
 | 报告路径 | `/lumifinreport/<report.html>` |
 | 下载路径 | `/download/<relative_path>` |
+| 预览路径 | `/preview/<relative_path>` |
+| 健康检查 | `/health` |
+| API 接口 | `/api/info/<relative_path>` |
 
 ## Procedure
 
