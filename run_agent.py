@@ -1607,8 +1607,14 @@ class AIAgent:
                         "max_iterations": self.max_iterations,
                         "reasoning_config": reasoning_config,
                         "max_tokens": max_tokens,
+                        "user_name": self._user_name,
+                        "chat_id": self._chat_id,
+                        "chat_name": self._chat_name,
+                        "chat_type": self._chat_type,
+                        "thread_id": self._thread_id,
+                        "gateway_session_key": self._gateway_session_key,
                     },
-                    user_id=None,
+                    user_id=self._user_id,
                     parent_session_id=self._parent_session_id,
                 )
             except Exception as e:

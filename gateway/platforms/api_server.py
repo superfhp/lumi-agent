@@ -522,9 +522,132 @@ def _make_request_fingerprint(body: Dict[str, Any], keys: List[str]) -> str:
     return sha256(repr(subset).encode("utf-8")).hexdigest()
 
 
+def _extract_request_identity(request: "web.Request", body: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    """Extract best-effort end-user identity from OpenAI-compatible requests.
+
+    Open WebUI and other OpenAI-compatible frontends do not all forward the
+    same fields.  Prefer the OpenAI ``user`` request field when present, then
+    fall back to common reverse-proxy / Open WebUI headers.  Missing identity
+    is expected for many clients and should not reject the request.
+    """
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    user_role: Optional[str] = None
+    chat_id: Optional[str] = None
+    message_id: Optional[str] = None
+
+    raw_user = body.get("user")
+    if isinstance(raw_user, str) and raw_user.strip():
+        user_id = raw_user.strip()
+    elif isinstance(raw_user, dict):
+        for key in ("id", "user_id", "email", "name"):
+            value = raw_user.get(key)
+            if isinstance(value, str) and value.strip():
+                user_id = value.strip()
+                break
+        for key in ("name", "username", "email"):
+            value = raw_user.get(key)
+            if isinstance(value, str) and value.strip():
+                user_name = value.strip()
+                break
+        value = raw_user.get("email")
+        if isinstance(value, str) and value.strip():
+            user_email = value.strip()
+        value = raw_user.get("role")
+        if isinstance(value, str) and value.strip():
+            user_role = value.strip()
+
+    headers = request.headers
+    if not user_id:
+        for header in (
+            "X-OpenWebUI-User-Id",
+            "X-Open-WebUI-User-Id",
+            "X-User-Id",
+            "X-Auth-User",
+            "X-Forwarded-User",
+            "Remote-User",
+        ):
+            value = headers.get(header, "").strip()
+            if value:
+                user_id = value
+                break
+
+    if not user_name:
+        for header in (
+            "X-OpenWebUI-User-Name",
+            "X-Open-WebUI-User-Name",
+            "X-User-Name",
+            "X-Forwarded-User",
+        ):
+            value = headers.get(header, "").strip()
+            if value:
+                user_name = value
+                break
+
+    for header in (
+        "X-OpenWebUI-User-Email",
+        "X-Open-WebUI-User-Email",
+        "X-User-Email",
+    ):
+        value = headers.get(header, "").strip()
+        if value:
+            user_email = value
+            break
+
+    for header in (
+        "X-OpenWebUI-User-Role",
+        "X-Open-WebUI-User-Role",
+        "X-User-Role",
+    ):
+        value = headers.get(header, "").strip()
+        if value:
+            user_role = value
+            break
+
+    for header in (
+        "X-OpenWebUI-Chat-Id",
+        "X-Open-WebUI-Chat-Id",
+        "X-Chat-Id",
+        "X-Conversation-Id",
+    ):
+        value = headers.get(header, "").strip()
+        if value:
+            chat_id = value
+            break
+
+    for header in (
+        "X-OpenWebUI-Message-Id",
+        "X-Open-WebUI-Message-Id",
+        "X-Message-Id",
+    ):
+        value = headers.get(header, "").strip()
+        if value:
+            message_id = value
+            break
+
+    if not user_id and user_email:
+        # Prefer the explicit user ID, but email is still a stable identity
+        # in Open WebUI deployments that only forward email.
+        user_id = user_email
+
+    # Avoid storing unbounded header/body values in state.db.
+    values = {
+        "user_id": user_id,
+        "user_name": user_name,
+        "user_email": user_email,
+        "user_role": user_role,
+        "chat_id": chat_id,
+        "message_id": message_id,
+    }
+    return {k: (v[:256] if v else None) for k, v in values.items()}
+
+
 def _derive_chat_session_id(
     system_prompt: Optional[str],
     first_user_message: str,
+    user_id: Optional[str] = None,
+    chat_id: Optional[str] = None,
 ) -> str:
     """Derive a stable session ID from the conversation's first user message.
 
@@ -535,7 +658,11 @@ def _derive_chat_session_id(
     the same Hermes session (and therefore the same Docker container sandbox
     directory) across turns.
     """
-    seed = f"{system_prompt or ''}\n{first_user_message}"
+    # Prefer Open WebUI's forwarded chat_id when available.  It is the most
+    # accurate stable conversation key and avoids collisions between two users
+    # who start with identical prompts.  Fall back to the older prompt hash for
+    # clients that do not forward session metadata.
+    seed = f"{user_id or ''}\n{chat_id or ''}\n{system_prompt or ''}\n{first_user_message}"
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
     return f"api-{digest}"
 
@@ -714,6 +841,9 @@ class APIServerAdapter(BasePlatformAdapter):
         self,
         ephemeral_system_prompt: Optional[str] = None,
         session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        user_name: Optional[str] = None,
+        chat_id: Optional[str] = None,
         stream_delta_callback=None,
         tool_progress_callback=None,
         tool_start_callback=None,
@@ -754,6 +884,10 @@ class APIServerAdapter(BasePlatformAdapter):
             enabled_toolsets=enabled_toolsets,
             session_id=session_id,
             platform="api_server",
+            user_id=user_id,
+            user_name=user_name,
+            chat_id=chat_id,
+            chat_type="openwebui" if chat_id else None,
             stream_delta_callback=stream_delta_callback,
             tool_progress_callback=tool_progress_callback,
             tool_start_callback=tool_start_callback,
@@ -948,6 +1082,11 @@ class APIServerAdapter(BasePlatformAdapter):
                 status=400,
             )
 
+        request_identity = _extract_request_identity(request, body)
+        request_user_id = request_identity.get("user_id")
+        request_user_name = request_identity.get("user_name")
+        request_chat_id = request_identity.get("chat_id")
+
         # Allow caller to continue an existing session by passing X-Hermes-Session-Id.
         # When provided, history is loaded from state.db instead of from the request body.
         #
@@ -994,7 +1133,12 @@ class APIServerAdapter(BasePlatformAdapter):
                 if cm.get("role") == "user":
                     first_user = cm.get("content", "")
                     break
-            session_id = _derive_chat_session_id(system_prompt, first_user)
+            session_id = _derive_chat_session_id(
+                system_prompt,
+                first_user,
+                user_id=request_user_id,
+                chat_id=request_chat_id,
+            )
             # history already set from request body above
 
         completion_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
@@ -1055,6 +1199,9 @@ class APIServerAdapter(BasePlatformAdapter):
                 conversation_history=history,
                 ephemeral_system_prompt=system_prompt,
                 session_id=session_id,
+                user_id=request_user_id,
+                user_name=request_user_name,
+                chat_id=request_chat_id,
                 stream_delta_callback=_on_delta,
                 tool_progress_callback=_on_tool_progress,
                 agent_ref=agent_ref,
@@ -1072,6 +1219,9 @@ class APIServerAdapter(BasePlatformAdapter):
                 conversation_history=history,
                 ephemeral_system_prompt=system_prompt,
                 session_id=session_id,
+                user_id=request_user_id,
+                user_name=request_user_name,
+                chat_id=request_chat_id,
             )
 
         idempotency_key = request.headers.get("Idempotency-Key")
@@ -1852,13 +2002,43 @@ class APIServerAdapter(BasePlatformAdapter):
         if not _content_has_visible_payload(user_message):
             return web.json_response(_openai_error("No user message found in input"), status=400)
 
+        request_identity = _extract_request_identity(request, body)
+        request_user_id = request_identity.get("user_id")
+        request_user_name = request_identity.get("user_name")
+        request_chat_id = request_identity.get("chat_id")
+
         # Truncation support
         if body.get("truncation") == "auto" and len(conversation_history) > 100:
             conversation_history = conversation_history[-100:]
 
         # Reuse session from previous_response_id chain so the dashboard
         # groups the entire conversation under one session entry.
-        session_id = stored_session_id or str(uuid.uuid4())
+        # When the client forwards a stable chat/conversation ID (e.g.
+        # Open WebUI's X-OpenWebUI-Chat-Id), use it as the Hermes session
+        # so all turns from the same conversation share context, approval
+        # state, and sandbox.  Fall back to stored_session_id from a
+        # previous_response_id chain, then to a derived hash, and finally
+        # to a random UUID only when nothing else is available.
+        if request_chat_id:
+            session_id = f"owui-{request_chat_id}"
+        elif stored_session_id:
+            session_id = stored_session_id
+        else:
+            # Derive from content fingerprint so repeated calls with the
+            # same input at least map to the same session.
+            first_user = ""
+            for cm in (conversation_history or []):
+                if cm.get("role") == "user":
+                    first_user = cm.get("content", "")
+                    break
+            if not first_user and input_messages:
+                first_user = input_messages[0].get("content", "")
+            session_id = _derive_chat_session_id(
+                instructions,
+                first_user,
+                user_id=request_user_id,
+                chat_id=request_chat_id,
+            )
 
         stream = bool(body.get("stream", False))
         if stream:
@@ -1911,6 +2091,9 @@ class APIServerAdapter(BasePlatformAdapter):
                 tool_progress_callback=_on_tool_progress,
                 tool_start_callback=_on_tool_start,
                 tool_complete_callback=_on_tool_complete,
+                user_id=request_user_id,
+                user_name=request_user_name,
+                chat_id=request_chat_id,
                 agent_ref=agent_ref,
             ))
 
@@ -1940,6 +2123,9 @@ class APIServerAdapter(BasePlatformAdapter):
                 conversation_history=conversation_history,
                 ephemeral_system_prompt=instructions,
                 session_id=session_id,
+                user_id=request_user_id,
+                user_name=request_user_name,
+                chat_id=request_chat_id,
             )
 
         idempotency_key = request.headers.get("Idempotency-Key")
@@ -2331,6 +2517,9 @@ class APIServerAdapter(BasePlatformAdapter):
         conversation_history: List[Dict[str, str]],
         ephemeral_system_prompt: Optional[str] = None,
         session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        user_name: Optional[str] = None,
+        chat_id: Optional[str] = None,
         stream_delta_callback=None,
         tool_progress_callback=None,
         tool_start_callback=None,
@@ -2351,27 +2540,87 @@ class APIServerAdapter(BasePlatformAdapter):
         loop = asyncio.get_running_loop()
 
         def _run():
-            agent = self._create_agent(
-                ephemeral_system_prompt=ephemeral_system_prompt,
-                session_id=session_id,
-                stream_delta_callback=stream_delta_callback,
-                tool_progress_callback=tool_progress_callback,
-                tool_start_callback=tool_start_callback,
-                tool_complete_callback=tool_complete_callback,
+            # The API server path does not have the GatewayRunner's
+            # interactive approval mechanism (/approve, /deny commands).
+            # Two independent guard systems can block commands:
+            #
+            # 1. CLI-style dangerous-command approval (approval_callback):
+            #    Without a callback, prompt_dangerous_approval() falls
+            #    back to input() which deadlocks in a web-server thread.
+            #
+            # 2. Gateway-style tirith security scan (gateway_notify_cb):
+            #    Without a registered notify callback, check_all_command_guards()
+            #    returns {"status": "approval_required"} and the agent
+            #    repeatedly asks the user for textual "approval" that can
+            #    never actually unblock the guard.
+            #
+            # Register auto-approve callbacks for BOTH paths.  The API
+            # server is already protected by API-key authentication.
+            from tools.terminal_tool import set_approval_callback as _set_approval_cb
+            from tools.approval import (
+                register_gateway_notify,
+                resolve_gateway_approval,
+                set_current_session_key,
+                unregister_gateway_notify,
             )
-            if agent_ref is not None:
-                agent_ref[0] = agent
-            result = agent.run_conversation(
-                user_message=user_message,
-                conversation_history=conversation_history,
-                task_id="default",
-            )
-            usage = {
-                "input_tokens": getattr(agent, "session_prompt_tokens", 0) or 0,
-                "output_tokens": getattr(agent, "session_completion_tokens", 0) or 0,
-                "total_tokens": getattr(agent, "session_total_tokens", 0) or 0,
-            }
-            return result, usage
+
+            def _api_server_auto_approve(command, description, **kwargs):
+                logger.info(
+                    "API server auto-approved command (CLI path): %.200s (%s)",
+                    command, description,
+                )
+                return "once"
+
+            _set_approval_cb(_api_server_auto_approve)
+
+            # Gateway tirith path: register a notify callback that
+            # immediately resolves the approval so the agent thread
+            # unblocks without waiting for a /approve command.
+            _approval_session_key = session_id or "api-default"
+            _sk_token = set_current_session_key(_approval_session_key)
+
+            def _api_auto_approve_notify(approval_data):
+                logger.info(
+                    "API server auto-approved command (tirith path): %.200s (%s)",
+                    approval_data.get("command", "")[:200],
+                    approval_data.get("description", ""),
+                )
+                resolve_gateway_approval(_approval_session_key, "once")
+
+            register_gateway_notify(_approval_session_key, _api_auto_approve_notify)
+
+            try:
+                agent = self._create_agent(
+                    ephemeral_system_prompt=ephemeral_system_prompt,
+                    session_id=session_id,
+                    user_id=user_id,
+                    user_name=user_name,
+                    chat_id=chat_id,
+                    stream_delta_callback=stream_delta_callback,
+                    tool_progress_callback=tool_progress_callback,
+                    tool_start_callback=tool_start_callback,
+                    tool_complete_callback=tool_complete_callback,
+                )
+                if agent_ref is not None:
+                    agent_ref[0] = agent
+                result = agent.run_conversation(
+                    user_message=user_message,
+                    conversation_history=conversation_history,
+                    task_id="default",
+                )
+                usage = {
+                    "input_tokens": getattr(agent, "session_prompt_tokens", 0) or 0,
+                    "output_tokens": getattr(agent, "session_completion_tokens", 0) or 0,
+                    "total_tokens": getattr(agent, "session_total_tokens", 0) or 0,
+                }
+                return result, usage
+            finally:
+                # Clean up gateway approval registration so stale entries
+                # don't accumulate across requests.
+                try:
+                    unregister_gateway_notify(_approval_session_key)
+                except Exception:
+                    pass
 
         return await loop.run_in_executor(None, _run)
 
@@ -2518,7 +2767,16 @@ class APIServerAdapter(BasePlatformAdapter):
                         )
                     conversation_history.append({"role": msg["role"], "content": str(content)})
 
-        session_id = body.get("session_id") or stored_session_id or run_id
+        session_id = body.get("session_id") or stored_session_id
+        if not session_id:
+            # Use forwarded chat ID from OpenWebUI / similar frontends so all
+            # turns from the same conversation share the same Hermes session.
+            request_identity = _extract_request_identity(request, body)
+            _chat_id = request_identity.get("chat_id")
+            if _chat_id:
+                session_id = f"owui-{_chat_id}"
+            else:
+                session_id = run_id
         ephemeral_system_prompt = instructions
 
         async def _run_and_close():

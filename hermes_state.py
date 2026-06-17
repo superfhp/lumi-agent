@@ -541,6 +541,15 @@ class SessionDB:
                     time.time(),
                 ),
             )
+            if user_id:
+                # API-server/OpenWebUI sessions historically created rows
+                # without user_id.  If the same deterministic session_id is
+                # seen again after identity extraction is available, fill the
+                # missing value instead of leaving the old NULL forever.
+                conn.execute(
+                    "UPDATE sessions SET user_id = ? WHERE id = ? AND (user_id IS NULL OR user_id = '')",
+                    (user_id, session_id),
+                )
         self._execute_write(_do)
         return session_id
 

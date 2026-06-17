@@ -12,7 +12,7 @@ authors = [{ name = "Nous Research" }]
 license = { text = "MIT" }
 dependencies = [
   # Core — pinned to known-good ranges to limit supply chain attack surface
-  "Langfuse>=4.6.1,<5",
+  "Langfuse>=2.60.1,<3",
   "openai>=2.21.0,<3",
   "anthropic>=0.39.0,<1",
   "python-dotenv>=1.2.1,<2",
@@ -174,4 +174,3 @@ exclude = ["*"]
 
 [tool.uv]
 exclude-newer = "7 days"
-exclude-newer-package = { langfuse = "2099-01-01" }
