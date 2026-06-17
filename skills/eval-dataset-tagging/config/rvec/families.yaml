@@ -1,0 +1,110 @@
+# ═════════════════════════════════════════════════════════════════════
+# 题型族路由（用户可自由修改 → 改完用 --show-rules --section families 验证）
+#
+# 工作机制：
+#   1. 脚本读取每条数据的 norm_task_from_filename
+#   2. 在下面 families 中查 match_norm_task → 命中则路由到该 family
+#   3. family 决定：用哪个 prompt 模板 + 关注哪些标签 + 哪些 primary 被禁用 + 额外规则
+#
+# 使用：
+#   python fin_rvec_tag.py --show-rules --section families
+#   python fin_rvec_tag.py --show-rules --family QA_CHOICE
+# ═════════════════════════════════════════════════════════════════════
+version: "1.0"
+
+task_family_rules:
+  _description: "任务族分类规则，按 norm_task_from_filename 精确匹配。fin_rvec_tag.py 根据匹配结果选择对应的 USER_PROMPT 模板。"
+
+  QA_CHOICE:
+    match_norm_task:
+      - "Fin-Compliance"
+      - "Fin-Economics"
+      - "Fin-Investing"
+      - "Fin-Literacy"
+      - "Fin-Quantitatics"
+    display_name: "金融选择题（CFA-like）"
+    input_features: "题干 + ABCD 选项，有 ground_truth_structured（单字母 + 解释）"
+    focus_labels:
+      - "R-REA-*"
+      - "R-UND-*"
+      - "R-FACT-2"
+      - "V-INFO-*"
+    forbid_primary:
+      - "R-FACT-1"
+    extra_rules:
+      - "考试题归因强制：答错时 label_rve_primary 必须是过程标签（R-REA-2/4/6 / R-FACT-2 / R-UND-2 等），禁止用 R-FACT-1"
+      - "T16 联合标注：必须搭配至少一个实际任务 T 标签（T04 计算/T02 事实/T06 分析等）"
+      - "答对的题（Accuracy=1）不应标 R-FACT-1/R-FACT-7"
+    template: "QA_CHOICE"
+
+  SENTIMENT:
+    match_norm_task:
+      - "FinNews-Sentiment"
+      - "FinNews-Anomalous-Emotion"
+    display_name: "金融新闻情感分析"
+    input_features: "新闻文本 + 期望情感标签，ground_truth_structured 为单一情感标签"
+    focus_labels:
+      - "R-UND-1"
+      - "R-UND-2"
+      - "V-INFO-1"
+      - "V-INFO-4"
+      - "E-CONS-2"
+      - "E-ADAPT-2"
+    forbid_primary: []
+    extra_rules:
+      - "情感判断错误优先归 R-UND-2 题意误解或 R-UND-1 主体识别错误，不轻易用 R-FACT-1"
+      - "回答冗长但无实质内容标 V-INFO-1 内容空洞；空泛附和标 V-INFO-4 证据不足"
+      - "情感标签准确但语气与新闻调性不符标 E-CONS-2 受众跳变"
+    template: "SENTIMENT"
+
+  REPORT_EVAL:
+    match_norm_task:
+      - "Eval_FullReport"
+      - "Eval_NewsReport"
+      - "Eval_ResearchReport"
+    display_name: "研报/材料分析（带 GT 评分）"
+    input_features: "长 context（PDF 摘要或片段），ground_truth_unstructured 为参考 PDF 文件名，judge_comment 含 factual_check/recall_check"
+    focus_labels:
+      - "R-FACT-7"
+      - "R-FACT-3"
+      - "R-FACT-8"
+      - "R-CONS-*"
+      - "E-STR-*"
+      - "V-EXE-*"
+    forbid_primary: []
+    extra_rules:
+      - "信息编造（R-FACT-7）需谨慎：context 中能找到来源则不算编造；context 为空时不可轻判 R-FACT-7"
+      - "重点关注 factual_check 中标红的事实点 → R-FACT-7/R-FACT-1"
+      - "重点关注 recall_check 中遗漏的核心论点 → R-FACT-3 漏答"
+      - "若 model_response_truncated=yes，禁止仅因末尾缺失判 R-FACT-3 漏答"
+    template: "REPORT_EVAL"
+
+  LONG_GEN:
+    match_norm_task:
+      - "10K_Analysis"
+      - "Report_Analysis"
+    display_name: "长报告生成（无显式 GT）"
+    input_features: "长 context，无 ground_truth_structured/unstructured，仅靠 judge_comment 的多维评分（factuality/recall/reasoning/structure/comprehensive）和自动核查信号判断"
+    focus_labels:
+      - "R-FACT-8"
+      - "V-INFO-*"
+      - "C-V-*"
+      - "C-R-*"
+      - "E-STR-*"
+    forbid_primary: []
+    extra_rules:
+      - "无 GT 场景下，事实判断主要依据 judge_comment.factual_check；优先归 R-FACT-7 编造 或 R-FACT-8 数据口径"
+      - "重点检查 R-FACT-8 数据口径/单位/时点错误（专业指标常见）"
+      - "结构化报告关注 E-STR-1 层次混乱 / E-STR-2 关键结论不突出"
+      - "若 comprehensive_score 较高（>0.7）但仍有问题，倾向标 P2 而非 P1"
+      - "若 model_response_truncated=yes，禁止仅因末尾缺失判 R-FACT-3 漏答"
+    template: "LONG_GEN"
+
+  GENERIC:
+    match_norm_task: []
+    display_name: "通用题型（兜底）"
+    input_features: "未识别到具体题型族时的默认配置"
+    focus_labels: []
+    forbid_primary: []
+    extra_rules: []
+    template: "GENERIC"

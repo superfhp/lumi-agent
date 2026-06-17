@@ -1,0 +1,25 @@
+mode: fin_rvec
+
+# 故意制造各种错误测试 config_validator
+fin_scene_schema:
+  - code: "F1"   # ❌ 编码非法（应当是 F01）
+    name: "测试场景"
+  - code: "FX"   # ❌ 编码非法
+    name: "测试场景2"
+
+task_type_schema: []  # ❌ 空列表
+
+rvec_schema:
+  R3_事实:
+    - {code: "R-FACT-1", name: "事实错误", type: "通用"}
+  # 没有 V/E/C ⚠️
+
+severity_schema:
+  levels: ["P0"]  # ⚠️ 缺少 P1/P2
+
+# scoring_rules 缺失 ⚠️
+
+task_family_rules:
+  QA_CHOICE:
+    display_name: "问答选择题"
+    # 缺少 match_norm_task ⚠️

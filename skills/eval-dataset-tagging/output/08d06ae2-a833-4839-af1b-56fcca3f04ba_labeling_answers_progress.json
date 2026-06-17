@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "total": 20,
+  "done": 20,
+  "success": 20,
+  "failed": 0,
+  "percent": 100.0,
+  "elapsed_s": 7.0,
+  "speed": 2.85,
+  "remaining_s": 0,
+  "updated_at": "2026-06-12T10:31:47.968105"
+}

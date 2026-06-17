@@ -1,0 +1,222 @@
+# ═════════════════════════════════════════════════════════════════════
+# RVEC 评测 Prompt 模板（用户可自由修改 → 改完用 --show-prompt 验证）
+#
+# 占位符约定：
+#   {schema_text}           ← 由 rules.yaml 自动生成（标签体系完整文本）
+#   {few_shot_text}         ← 由 fin_rvec_config 中 few_shot_examples 生成
+#   {family_display}        ← 题型族显示名（来自 families.yaml）
+#   {family_features}       ← 题型族特征描述
+#   {family_focus}          ← 该题型族重点关注的标签
+#   {family_extra_rules}    ← 该题型族额外规则
+#   {question}              ← 题目主体
+#   {context}               ← 完整题面/附件（PDF 摘要等）
+#   {expected_output}       ← 参考答案（结构化）
+#   {ground_truth_unstructured}  ← 非结构化参考（PDF 文件名）
+#   {answer}                ← 模型实际回答
+#   {model_choice}          ← 模型选项（仅选择题）
+#   {expected_choice}       ← 期望选项（仅选择题）
+#   {reasoning}             ← 模型推理过程
+#   {accuracy}              ← 原始 Accuracy 评分
+#   {judge_summary}         ← judge_comment 摘要（自动注入）
+#   {truncation_warning}    ← 截断警告（自动注入）
+#   {multi_dim_scores}      ← 多维评分（factuality/recall 等）
+#
+# 使用：
+#   python fin_rvec_tag.py --show-prompt --family QA_CHOICE       # 看模板
+#   python fin_rvec_tag.py --show-prompt --family QA_CHOICE \
+#       --with-sample data.csv                                     # 看真实拼接
+# ═════════════════════════════════════════════════════════════════════
+version: "1.0"
+
+# ── system prompt：给 LLM 的角色 + 流程 + 输出格式约定 ──
+system_prompt: |-
+  你是一位金融领域大模型评测专家，精通 RVEC 评测标签体系。你需要对模型在金融场景下的输出进行结构化评测。
+
+  ## 评测流程
+  1. **识别需求侧画像**：判断金融业务场景（F轴）和任务类型（T轴）
+  2. **打 RVEC 标签**：识别 R（硬伤）、V（价值）、E（体验）负向问题 + C（亮点）
+  3. **判定 P 等级**：每个负向标签标注 P0/P1/P2，**严重度顺序为 P0 > P1 > P2（P0 最严重）**
+  4. **计算最终评分**：根据最严重负向信号给出 0-4 分
+
+  ## 核心原则
+  - R 优先：R-P0 直接判 0 分，不因 V/E/C 好而抵消
+  - C 不抵消：亮点不能抵消 R/V/E 的负向问题
+  - P2 二次判断：仅 P2 时需判断是否需要修改（需改=2分，不需改=3分）
+  - 单一问题最小归因：优先选最小最直接的标签
+
+  ## 标签体系
+  {schema_text}
+  {few_shot_text}
+
+  ## 输出要求
+  你必须以**严格 JSON**格式输出，不要包含任何其他文字。格式如下：
+  {{
+    "label_fin_scene": "F08 金融风险...",
+    "label_task_type": "T16 题目作答...；T04 计算、测算...",
+    "label_rve_primary": "R-REA-2 推理跳步",
+    "label_rve_all": "R-REA-2 推理跳步：P1；R-FACT-2 计算错误：P2",
+    "label_rve_score_all": "R-REA-2:0.7;R-FACT-2:0.3",
+    "label_severity": "P1",
+    "label_score": 1,
+    "label_highlights": "C-R-3 逻辑完整",
+    "label_evidence": "摘录有问题的具体句子",
+    "label_reason": "判定理由"
+  }}
+
+  字段说明：
+  - label_fin_scene：金融场景标签（F轴），多选用「；」分隔，首个为 primary
+  - label_task_type：任务类型标签（T轴），多选用「；」分隔，首个为 primary。T16 必须搭配实际任务 T 标签
+  - label_rve_primary：最主要的一个 RVE 负向标签（仅 R/V/E 三轴，不含 C），无问题填 "NONE"
+  - label_rve_all：全部 RVE 负向标签，「；」分隔，**每个标签末尾用「：P0/P1/P2」内嵌严重程度**（如 "R-FACT-1 事实错误：P1；R-REA-4 前提错误：P0"），无问题填 "NONE"
+  - label_rve_score_all：**【必填字段】**各负向信号对最终判定的独立影响分值（0~1），格式 "标签编码:分值;标签编码:分值"（如 "R-FACT-1:0.8;R-REA-4:1.0"）。**只要 label_rve_all 不是 "NONE"，本字段就必须给出对应每个标签的分值，分值数量与顺序必须与 label_rve_all 完全对齐**。无问题时填 "NONE"。
+  - label_severity：最严重的 P 等级（P0/P1/P2/NONE）。**注意：此字段会由脚本从 label_rve_all 自动派生覆盖，但你仍需输出**
+  - label_score：0-4 分整数（依据 scoring_rules）
+  - label_highlights：C 亮点标签（仅 C 轴），「；」分隔，无亮点填 "NONE"
+  - label_evidence：摘录有问题的关键句子（从模型回答或题面中），无问题留空
+  - label_reason：每个标签的判定理由
+
+# ── user prompt header：所有 family 共用的开头 ──
+user_prompt_header: |-
+  请对以下模型回答进行金融 RVEC 评测。
+
+  【题型族】{family_display}
+  【题型说明】{family_features}
+  【该题型重点关注的负向标签】{family_focus}
+  {family_extra_rules}
+
+# ── 5 套 family 模板（与 user_prompt_header 拼接使用）──
+family_templates:
+  QA_CHOICE: |-
+    【题目/问题】
+    {question}
+
+    【完整题面/附件（模型作答时可见的完整上下文）】
+    {context}
+
+    【参考答案（含正确选项 + 解释）】
+    {expected_output}
+
+    【模型实际回答】
+    {answer}
+
+    【模型选项】{model_choice}
+    【期望选项】{expected_choice}
+
+    【模型推理过程】
+    {reasoning}
+
+    【原始 Accuracy 评分】{accuracy}
+    {judge_summary}
+    {truncation_warning}
+
+    ## 重要标注规则提醒（CFA/金融选择题专用）
+    1. **考试题归因强制**：当模型答错（Accuracy<1）时，`label_rve_primary` **必须**是导致错误的过程标签（R-REA-2 推理跳步、R-REA-4 前提错误、R-REA-6 概念误用、R-FACT-2 计算错误、R-UND-2 理解偏差）。**禁止用 R-FACT-1 作为考试题主标签**——R-FACT-1 仅在模型对核心知识点本身就是错的（纯知识缺失、无推理过程可归因）时使用。
+    2. **T16 联合标注**：考试场景必须同时标注 T16 + 至少一个实际任务标签（T04 计算/T02 事实/T06 分析归因等），T16 不可单独出现。
+    3. **答对的题不标 R-FACT**：Accuracy=1 时，回答与参考一致，不应标 R-FACT-1/R-FACT-7。如有问题归 V/E 维度。
+    4. **完整题面/附件为"无附加题面信息"时**：审慎使用 R-FACT-7（信息编造）——模型作答时可能有我们看不到的背景材料。
+
+  SENTIMENT: |-
+    【新闻文本/题目】
+    {question}
+
+    【完整文本】
+    {context}
+
+    【期望情感标签】
+    {expected_output}
+
+    【模型实际回答】
+    {answer}
+
+    【模型推理过程】
+    {reasoning}
+
+    【原始 Accuracy 评分】{accuracy}
+    {judge_summary}
+    {truncation_warning}
+
+    ## 重要标注规则提醒（金融新闻情感分析专用）
+    1. **情感判断错误的归因**：优先归 R-UND-2 题意误解 或 R-UND-1 主体识别错误，**不要轻易用 R-FACT-1**（情感判断不是事实查询）。
+    2. **空泛回答**：回答冗长但无实质内容 → V-INFO-1 内容空洞；空泛附和无证据 → V-INFO-4 证据不足。
+    3. **语气不匹配**：情感标签准确但语气与新闻调性不符 → E-CONS-2 受众跳变 或 E-ADAPT-2 风格/受众不匹配。
+    4. **答对的题不标 R-FACT**：Accuracy=1 时不应标 R-FACT-*。
+
+  REPORT_EVAL: |-
+    【任务说明/问题】
+    {question}
+
+    【完整背景材料（PDF 摘要或片段）】
+    {context}
+
+    【参考材料】
+    {ground_truth_unstructured}
+
+    【模型实际回答】
+    {answer}
+
+    【模型推理过程】
+    {reasoning}
+
+    【多维评分】
+    {multi_dim_scores}
+    {judge_summary}
+    {truncation_warning}
+
+    ## 重要标注规则提醒（研报/材料分析专用）
+    1. **信息编造（R-FACT-7）的判定**：模型回答中的信息如果能从【完整背景材料】中找到来源，则不算编造；只有完全凭空捏造才标 R-FACT-7。**【完整背景材料】为空时不可轻判 R-FACT-7**。
+    2. **优先依据 judge_comment.factual_check**：若 factual_check 已标出错误事实点，对应归 R-FACT-7 编造 或 R-FACT-1 事实错误。
+    3. **优先依据 judge_comment.recall_check**：若 recall_check 标出遗漏的核心论点，归 R-FACT-3 漏答。
+    4. **截断警告**：若 model_response_truncated=yes，禁止仅因末尾缺失判 R-FACT-3 漏答。
+    5. **数据口径**：研报中的指标数字若单位/时点/口径错误 → R-FACT-8 数据口径错误。
+    6. **结构问题**：长报告关注 E-STR-1 层次混乱、E-STR-2 关键结论不突出。
+
+  LONG_GEN: |-
+    【任务说明/问题】
+    {question}
+
+    【完整背景材料】
+    {context}
+
+    【模型实际回答】
+    {answer}
+
+    【模型推理过程】
+    {reasoning}
+
+    【多维评分（无显式参考答案，请综合判断）】
+    {multi_dim_scores}
+    {judge_summary}
+    {truncation_warning}
+
+    ## 重要标注规则提醒（长报告生成 / 无显式 GT 专用）
+    1. **无 GT 场景下的事实判断**：主要依据 judge_comment.factual_check；优先归 R-FACT-7 编造 或 R-FACT-8 数据口径。
+    2. **数据口径**：报告中的财务指标若单位/时点/口径错误 → R-FACT-8。
+    3. **内容质量**：空洞无信息量 → V-INFO-1；分析浅 → V-INFO-2 分析浅显；结论无支撑 → V-INFO-4 证据不足。
+    4. **亮点**：长报告若结构清晰、多方案对比、风险提示充分，可给 C-V-1 多方案对比、C-R-2 风险完整、C-E-2 结构友好。
+    5. **截断警告**：若 model_response_truncated=yes，禁止仅因末尾缺失判 R-FACT-3 漏答。
+    6. **若 comprehensive_score 较高（>0.7）**但仍有问题，倾向标 P2 而非 P1。
+
+  GENERIC: |-
+    【题目/问题】
+    {question}
+
+    【完整题面/附件】
+    {context}
+
+    【参考答案】
+    {expected_output}
+
+    【模型实际回答】
+    {answer}
+
+    【模型推理过程】
+    {reasoning}
+
+    【原始 Accuracy 评分】{accuracy}
+    {judge_summary}
+    {truncation_warning}
+
+    ## 重要标注规则提醒（通用）
+    1. **信息编造判定**：模型回答中的信息如果能从【完整题面/附件】中找到来源，则不算编造（R-FACT-7）。
+    2. **T16 联合标注**：如果属于考试/作答场景，T16 必须搭配至少一个实际任务 T 标签。
+    3. **答对的题不标 R-FACT**：Accuracy=1 时不应标 R-FACT-* 类。

@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>金融 RVEC 打标分析报告 — labeling_answers_rvec_labeled</title>
+<style>
+:root { --bg:#f4f6fb; --card:#fff; --border:#e4e8ef; --text:#1a1d23; --text2:#5f6577; --blue:#4361ee; --red:#ef476f; --orange:#f77f00; --green:#06d6a0; --purple:#7209b7; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Inter',-apple-system,'Segoe UI','Microsoft YaHei',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+.container { max-width:1400px; margin:0 auto; padding:32px 24px; }
+h1 { font-size:28px; font-weight:800; background:linear-gradient(135deg,var(--blue),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
+h2 { font-size:20px; font-weight:700; margin:40px 0 16px; padding-bottom:8px; border-bottom:2px solid var(--blue); }
+h3 { font-size:18px; margin-bottom:12px; }
+.subtitle { color:var(--text2); font-size:13px; margin-bottom:32px; }
+
+/* 总览卡片 */
+.overview { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:32px; }
+.ov-card { background:var(--card); border-radius:var(--radius); padding:20px 28px; box-shadow:0 2px 12px rgba(0,0,0,0.06); text-align:center; min-width:120px; flex:1; }
+.ov-label { font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
+.ov-val { font-size:32px; font-weight:800; margin-top:4px; }
+
+/* 排行榜 */
+.ranking-table { width:100%; border-collapse:collapse; background:var(--card); border-radius:var(--radius); overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+.ranking-table th { background:#1a237e; color:white; padding:12px 16px; text-align:center; font-size:13px; }
+.ranking-table td { padding:12px 16px; text-align:center; border-bottom:1px solid #f0f2f8; }
+.ranking-table tr:hover { background:#f8f9fc; }
+
+/* 模型详情 */
+.model-detail { background:var(--card); border-radius:var(--radius); padding:24px; margin-bottom:24px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+.detail-card { background:#f8f9fc; border-radius:10px; padding:16px; }
+.detail-card h4 { font-size:14px; margin-bottom:10px; color:var(--text2); }
+
+/* 分数条 */
+.score-bars { display:flex; flex-direction:column; gap:6px; }
+.score-bar-item { display:flex; align-items:center; gap:8px; font-size:12px; }
+.score-bar { height:18px; border-radius:4px; min-width:2px; transition:width 0.3s; }
+.score-bar-item span { min-width:90px; color:var(--text2); }
+
+/* RVEC 维度 */
+.dim-row { display:flex; align-items:center; gap:8px; margin:6px 0; }
+.dim-label { width:80px; font-size:13px; font-weight:600; }
+.dim-bar-wrap { flex:1; background:#e8eaf0; height:16px; border-radius:4px; overflow:hidden; }
+.dim-bar { height:100%; border-radius:4px; transition:width 0.3s; }
+.dim-count { width:30px; text-align:right; font-size:12px; font-weight:700; }
+
+/* 标签表 */
+.tag-table { width:100%; font-size:13px; border-collapse:collapse; }
+.tag-table td { padding:4px 8px; border-bottom:1px solid #eee; }
+.tag-cell { max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Chip */
+.chip-wrap { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { background:#e8eaf0; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500; }
+
+/* 分数 badge */
+.score-badge { display:inline-block; color:white; padding:2px 10px; border-radius:12px; font-size:13px; margin-left:8px; }
+
+/* 全局分数分布 */
+.ov-score-row { display:flex; gap:8px; align-items:flex-end; height:120px; margin:16px 0; }
+.ov-score-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.ov-score-bar { width:100%; height:var(--pct); background:var(--color); border-radius:6px 6px 0 0; min-height:4px; transition:height 0.3s; }
+.ov-score-label { text-align:center; font-size:11px; color:var(--text2); margin-top:4px; }
+
+/* Badcase */
+.badcase-card { background:var(--card); border-radius:var(--radius); padding:16px 20px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); border-left:4px solid var(--red); }
+.bc-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+.bc-num { font-weight:800; color:var(--text2); }
+.bc-model { font-weight:600; color:var(--blue); }
+.bc-score { color:white; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; }
+.bc-tag { background:#FEE2E2; color:#DC2626; padding:2px 10px; border-radius:10px; font-size:12px; }
+.bc-body { font-size:13px; line-height:1.8; }
+.bc-field { margin:4px 0; }
+.bc-evidence { background:#FEF3C7; padding:6px 10px; border-radius:6px; margin-top:6px; }
+
+.footer { text-align:center; color:var(--text2); padding:40px 0 20px; font-size:12px; }
+
+@media (max-width:768px) {
+  .overview { flex-direction:column; }
+  .detail-grid { grid-template-columns:1fr; }
+}
+</style>
+</head><body>
+<div class="container">
+    <h1>📊 金融 RVEC 打标分析报告 — labeling_answers_rvec_labeled</h1>
+    <div class="subtitle">生成时间：2026-06-16 13:51:45 · 12 个模型 · 331 条数据 · 金融领域</div>
+
+    <!-- 总览 -->
+    <div class="overview">
+        <div class="ov-card"><span class="ov-label">评测样本</span><span class="ov-val">331</span></div>
+        <div class="ov-card"><span class="ov-label">模型数</span><span class="ov-val" style="color:var(--blue)">12</span></div>
+        <div class="ov-card"><span class="ov-label">平均分</span><span class="ov-val" style="color:var(--red)">1.92</span></div>
+        <div class="ov-card"><span class="ov-label">P0 (致命)</span><span class="ov-val" style="color:var(--red)">0</span></div>
+        <div class="ov-card"><span class="ov-label">P1 (严重)</span><span class="ov-val" style="color:var(--orange)">187</span></div>
+        <div class="ov-card"><span class="ov-label">P2 (轻微)</span><span class="ov-val" style="color:var(--blue)">84</span></div>
+    </div>
+
+    <!-- 全局分数分布 -->
+    <h2>📈 整体分数分布</h2>
+    <div class="ov-score-row"><div class="ov-score-item" style="--pct:0.0%;--color:#DC2626"><div class="ov-score-bar"></div><div class="ov-score-label">0分<br>0条<br>0%</div></div><div class="ov-score-item" style="--pct:56.49546827794561%;--color:#D97706"><div class="ov-score-bar"></div><div class="ov-score-label">1分<br>187条<br>56%</div></div><div class="ov-score-item" style="--pct:12.386706948640484%;--color:#F59E0B"><div class="ov-score-bar"></div><div class="ov-score-label">2分<br>41条<br>12%</div></div><div class="ov-score-item" style="--pct:14.19939577039275%;--color:#2563EB"><div class="ov-score-bar"></div><div class="ov-score-label">3分<br>47条<br>14%</div></div><div class="ov-score-item" style="--pct:16.91842900302115%;--color:#059669"><div class="ov-score-bar"></div><div class="ov-score-label">4分<br>56条<br>17%</div></div></div>
+
+    <!-- 排行榜 -->
+    <h2>🏆 模型排行榜</h2>
+    <table class="ranking-table">
+        <tr><th>#</th><th>模型</th><th>均分</th><th>样本数</th><th>P0</th><th>P1</th><th>P2</th></tr>
+        <tr>
+            <td>1</td>
+            <td style="font-weight:600">kimi-k2.6</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">2.39</td>
+            <td>46</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">15</td>
+            <td style="color:#2563EB">19</td>
+        </tr><tr>
+            <td>2</td>
+            <td style="font-weight:600">deepseek-v4-pro</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">2.37</td>
+            <td>46</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">19</td>
+            <td style="color:#2563EB">14</td>
+        </tr><tr>
+            <td>3</td>
+            <td style="font-weight:600">glm-5.1</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">2.11</td>
+            <td>46</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">22</td>
+            <td style="color:#2563EB">12</td>
+        </tr><tr>
+            <td>4</td>
+            <td style="font-weight:600">claude-sonnet-4-6</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">1.98</td>
+            <td>46</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">24</td>
+            <td style="color:#2563EB">15</td>
+        </tr><tr>
+            <td>5</td>
+            <td style="font-weight:600">qwen-plus</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">1.92</td>
+            <td>12</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">8</td>
+            <td style="color:#2563EB">1</td>
+        </tr><tr>
+            <td>6</td>
+            <td style="font-weight:600">iquest</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">1.83</td>
+            <td>29</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">16</td>
+            <td style="color:#2563EB">8</td>
+        </tr><tr>
+            <td>7</td>
+            <td style="font-weight:600">safety</td>
+            <td style="color:#D97706;font-weight:700;font-size:18px">1.56</td>
+            <td>39</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">28</td>
+            <td style="color:#2563EB">8</td>
+        </tr><tr>
+            <td>8</td>
+            <td style="font-weight:600">iquest-0509</td>
+            <td style="color:#DC2626;font-weight:700;font-size:18px">1.41</td>
+            <td>51</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">41</td>
+            <td style="color:#2563EB">5</td>
+        </tr><tr>
+            <td>9</td>
+            <td style="font-weight:600">deepseek-v3.2</td>
+            <td style="color:#DC2626;font-weight:700;font-size:18px">1.25</td>
+            <td>4</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">3</td>
+            <td style="color:#2563EB">1</td>
+        </tr><tr>
+            <td>10</td>
+            <td style="font-weight:600">qwen3.6-plus</td>
+            <td style="color:#DC2626;font-weight:700;font-size:18px">1.25</td>
+            <td>4</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">3</td>
+            <td style="color:#2563EB">1</td>
+        </tr><tr>
+            <td>11</td>
+            <td style="font-weight:600">glm-5</td>
+            <td style="color:#DC2626;font-weight:700;font-size:18px">1.0</td>
+            <td>4</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">4</td>
+            <td style="color:#2563EB">0</td>
+        </tr><tr>
+            <td>12</td>
+            <td style="font-weight:600">kimi-k2.5</td>
+            <td style="color:#DC2626;font-weight:700;font-size:18px">1.0</td>
+            <td>4</td>
+            <td style="color:#DC2626;font-weight:600">0</td>
+            <td style="color:#D97706;font-weight:600">4</td>
+            <td style="color:#2563EB">0</td>
+        </tr>
+    </table>
+
+    <!-- 各模型详情 -->
+    <h2>🔍 各模型详情分析</h2>
+    
+        <div class="model-detail" id="model-kimi-k2-6">
+            <h3>📌 kimi-k2.6 <span class="score-badge" style="background:#F59E0B">2.39分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:32.608695652173914%;background:#D97706"></div><span>1分: 15条 (33%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:21.73913043478261%;background:#F59E0B"></div><span>2分: 10条 (22%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:19.565217391304348%;background:#2563EB"></div><span>3分: 9条 (20%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:26.08695652173913%;background:#059669"></div><span>4分: 12条 (26%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F07: 10</span><span class="chip">F09: 10</span><span class="chip">F01: 6</span><span class="chip">F08: 6</span><span class="chip">F04: 5</span><span class="chip">F05: 4</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-deepseek-v4-pro">
+            <h3>📌 deepseek-v4-pro <span class="score-badge" style="background:#F59E0B">2.37分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:41.30434782608695%;background:#D97706"></div><span>1分: 19条 (41%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:6.521739130434782%;background:#F59E0B"></div><span>2分: 3条 (7%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:26.08695652173913%;background:#2563EB"></div><span>3分: 12条 (26%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:26.08695652173913%;background:#059669"></div><span>4分: 12条 (26%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F07: 10</span><span class="chip">F09: 10</span><span class="chip">F08: 6</span><span class="chip">F01: 5</span><span class="chip">F05: 4</span><span class="chip">F04: 4</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-glm-5-1">
+            <h3>📌 glm-5.1 <span class="score-badge" style="background:#F59E0B">2.11分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:47.82608695652174%;background:#D97706"></div><span>1分: 22条 (48%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:17.391304347826086%;background:#F59E0B"></div><span>2分: 8条 (17%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:10.869565217391305%;background:#2563EB"></div><span>3分: 5条 (11%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:23.91304347826087%;background:#059669"></div><span>4分: 11条 (24%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F07: 10</span><span class="chip">F09: 10</span><span class="chip">F08: 7</span><span class="chip">F05: 6</span><span class="chip">F01: 5</span><span class="chip">F04: 5</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-claude-sonnet-4-6">
+            <h3>📌 claude-sonnet-4-6 <span class="score-badge" style="background:#D97706">1.98分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:52.17391304347826%;background:#D97706"></div><span>1分: 24条 (52%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:13.043478260869565%;background:#F59E0B"></div><span>2分: 6条 (13%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:19.565217391304348%;background:#2563EB"></div><span>3分: 9条 (20%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:15.217391304347828%;background:#059669"></div><span>4分: 7条 (15%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F07: 10</span><span class="chip">F09: 10</span><span class="chip">F08: 6</span><span class="chip">F01: 6</span><span class="chip">F04: 5</span><span class="chip">F05: 5</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-qwen-plus">
+            <h3>📌 qwen-plus <span class="score-badge" style="background:#D97706">1.92分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:66.66666666666666%;background:#D97706"></div><span>1分: 8条 (67%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#F59E0B"></div><span>2分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:8.333333333333332%;background:#2563EB"></div><span>3分: 1条 (8%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:25.0%;background:#059669"></div><span>4分: 3条 (25%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F09: 10</span><span class="chip">F10: 2</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-iquest">
+            <h3>📌 iquest <span class="score-badge" style="background:#D97706">1.83分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:55.172413793103445%;background:#D97706"></div><span>1分: 16条 (55%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:17.24137931034483%;background:#F59E0B"></div><span>2分: 5条 (17%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:17.24137931034483%;background:#2563EB"></div><span>3分: 5条 (17%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:10.344827586206897%;background:#059669"></div><span>4分: 3条 (10%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F09: 10</span><span class="chip">F04: 7</span><span class="chip">F05: 4</span><span class="chip">F10: 4</span><span class="chip">F08: 2</span><span class="chip">F07: 2</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-safety">
+            <h3>📌 safety <span class="score-badge" style="background:#D97706">1.56分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:71.7948717948718%;background:#D97706"></div><span>1分: 28条 (72%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:7.6923076923076925%;background:#F59E0B"></div><span>2分: 3条 (8%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:12.82051282051282%;background:#2563EB"></div><span>3分: 5条 (13%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:7.6923076923076925%;background:#059669"></div><span>4分: 3条 (8%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F07: 14</span><span class="chip">F01: 7</span><span class="chip">F08: 6</span><span class="chip">F09: 5</span><span class="chip">F05: 3</span><span class="chip">F04: 2</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-iquest-0509">
+            <h3>📌 iquest-0509 <span class="score-badge" style="background:#D97706">1.41分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:80.3921568627451%;background:#D97706"></div><span>1分: 41条 (80%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:7.8431372549019605%;background:#F59E0B"></div><span>2分: 4条 (8%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:1.9607843137254901%;background:#2563EB"></div><span>3分: 1条 (2%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:9.803921568627452%;background:#059669"></div><span>4分: 5条 (10%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F07: 22</span><span class="chip">F01: 12</span><span class="chip">F08: 9</span><span class="chip">F05: 4</span><span class="chip">F04: 2</span><span class="chip">F10: 2</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-deepseek-v3-2">
+            <h3>📌 deepseek-v3.2 <span class="score-badge" style="background:#D97706">1.25分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:75.0%;background:#D97706"></div><span>1分: 3条 (75%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:25.0%;background:#F59E0B"></div><span>2分: 1条 (25%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#2563EB"></div><span>3分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#059669"></div><span>4分: 0条 (0%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F09: 4</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-qwen3-6-plus">
+            <h3>📌 qwen3.6-plus <span class="score-badge" style="background:#D97706">1.25分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:75.0%;background:#D97706"></div><span>1分: 3条 (75%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:25.0%;background:#F59E0B"></div><span>2分: 1条 (25%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#2563EB"></div><span>3分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#059669"></div><span>4分: 0条 (0%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F09: 4</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-glm-5">
+            <h3>📌 glm-5 <span class="score-badge" style="background:#D97706">1.0分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:100.0%;background:#D97706"></div><span>1分: 4条 (100%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#F59E0B"></div><span>2分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#2563EB"></div><span>3分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#059669"></div><span>4分: 0条 (0%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F09: 3</span><span class="chip">F07: 1</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-detail" id="model-kimi-k2-5">
+            <h3>📌 kimi-k2.5 <span class="score-badge" style="background:#D97706">1.0分</span></h3>
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <h4>📊 分数分布</h4>
+                    <div class="score-bars"><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#DC2626"></div><span>0分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:100.0%;background:#D97706"></div><span>1分: 4条 (100%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#F59E0B"></div><span>2分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#2563EB"></div><span>3分: 0条 (0%)</span></div><div class="score-bar-item"><div class="score-bar" style="width:0.0%;background:#059669"></div><span>4分: 0条 (0%)</span></div></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🎯 RVEC 维度</h4>
+                    <div class="dim-row"><span class="dim-label">R 可信性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#DC2626"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">V 有用性</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#D97706"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">E 体验</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#2563EB"></div></div><span class="dim-count">0</span></div><div class="dim-row"><span class="dim-label">C 亮点</span><div class="dim-bar-wrap"><div class="dim-bar" style="width:0.0%;background:#059669"></div></div><span class="dim-count">0</span></div>
+                </div>
+                <div class="detail-card">
+                    <h4>🏷️ 高频问题标签</h4>
+                    <table class="tag-table"></table>
+                </div>
+                <div class="detail-card">
+                    <h4>🗂️ 场景分布</h4>
+                    <div class="chip-wrap"><span class="chip">F09: 3</span><span class="chip">F07: 1</span></div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Badcase -->
+    <h2>🚨 典型问题样本（score ≤ 1）</h2>
+    
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#1</span>
+                <span class="bc-model">claude-sonnet-4-6</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Meshack Bradovic, CFA, was recently hired as a credit analyst at a credit rating agency whose major clients include publicly listed companies on the local stock exchange. One of the clients is currently preparing to issue a new bond to finance a major factory project. Analysts are speculating that w</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong># 结构化思维链分析
+
+##
+
+最终答案：C
+
+**Bradovic 应与该信用评级报告、债券发行及相关客户脱离关联。**
+
+这是在内部合规渠道失效后，防止违反 CFA 道德准则（尤其是 Standard I(B) 独立性与客观性）的**最恰当且充分的行动**，同时也无需采取辞职这一更极端的措施。</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>最终答案：C；这是在内部合规渠道失效后，防止违反 CFA 道德准则（尤其是 Standard I(B) 独立性与客观性）的最恰当且充分的行动，同时也无需采取辞职这一更极端的措施。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据F×T交叉校验，本题属于考试作答，需优先核查答案正误。模型将正确选项误答为C，首先构成R-FACT-1 事实错误：P1。其错误并非单纯结论偏差，还体现在论证前提上：将“内部合规渠道失效后，只需脱离关联、无需辞职”当作充分前提，忽略题干体现的系统性、持续性违规环境，属R-REA-4 前提错误：P1。同时，模型对CFA伦理处置机制理解有偏差，把一般性的disassociate原则机械套用于系统性失范场景，错误判断辞职不是最适当措施，属R-REA-6：P1。回答结构清晰、论述展开完整，可给C-E-2与C-R-3，但不能抵消答案错误。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#2</span>
+                <span class="bc-model">claude-sonnet-4-6</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Were Gataki's comments about the CFA Program at the training session a violation of the Standards?
+A: No  B: Yes, with respect to exam content and difficulty  C: Yes, with respect to her performance on the exams</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong># 结构化分析
+
+##
+
+最终答案：**A（No，不违规）**
+
+**理由总结：** Gataki对考试难度的评论属于允许的一般性个人体验表达，未涉及保密的具体考试内容；声称&quot;每级一次通过&quot;是对个人成就的如实陈述，不构成夸大或误导。两者均未违反Standard VII(A)。</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>两者均未违反Standard VII(A)。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据交叉校验，T16考试作答场景应优先核查答案正误而非仅看表述深浅。模型将“两者均未违反Standard VII(A)”作为判断核心，但参考答案指出相关行为并非都能简单归为“未违反VII(A)”，尤其“每级一次通过”的表述涉及对CFA Standards适用条款的具体区分，模型的结论性表述与标准答案口径不一致，构成事实错误（R-FACT-1，P1）。同时，模型将该情形主要纳入Standard VII(A)框架，未正确区分Standard I(C)、Standard VII(B)等标准的适用边界，属于金融专业概念/规则适用误用（R-REA-6，P1）。虽然回答结构清晰、语言自然，但在考试题场景下，答案正确性和规则适用是核心，故最终评1分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#3</span>
+                <span class="bc-model">claude-sonnet-4-6</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>With regard to the HydraPharma recommendation downgrade, did Gataki violate the Standard relating to fair dealing?
+A: No  B: Yes, by calling Scala  C: Yes, by selling the shares held in discretionary accounts</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong># 结构化分析：Gataki是否违反公平对待准则
+
+##
+
+最终答案：**B**
+
+&gt; **Yes, by calling Scala** — Gataki通过额外致电Scala，给予了这位大客户其他客户未能享受的优先待遇，违反了Standard III(B)公平对待准则。尽管出发点是善意，但公平对待要求对所有客户一视同仁，不得因账户规模大小而区别对待。</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>Yes, by calling Scala — Gataki通过额外致电Scala，给予了这位大客户其他客户未能享受的优先待遇，违反了Standard III(B)公平对待准则。；额外致电Scala | ❌ 单独给予某一客户额外服务，构成优先待遇</div>
+                <div class="bc-field"><strong>💬 理由：</strong>结合F×T交叉校验，本题属于考试作答场景，需优先检查答案正确性。模型最终判断与参考答案相反，直接把本不违规的后续跟进判为违反Fair Dealing，首先构成题目作答结果层面的事实错误，标注R-FACT-1 P1。进一步看，其错误来源于将Fair Dealing机械理解为“任何对单个客户的额外联系都属于不公平优待”，而参考答案明确区分了‘先向所有客户完成分发’与‘之后对未收到邮件者做个别跟进’的合规边界，因此属于金融合规准则的概念误用，标注R-REA-6 P1。同时，模型将“额外致电Scala”直接当前提等同于“优先获知/优先待遇”，忽略题干关键时序与既有分发事实，属于关键前提错误，标注R-REA-4 P1。回答形式上有分点和表格化表达，结构较清晰，可给C-E-2，但不影响最终1分判定。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#4</span>
+                <span class="bc-model">deepseek-v4-pro</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Meshack Bradovic, CFA, was recently hired as a credit analyst at a credit rating agency whose major clients include publicly listed companies on the local stock exchange. One of the clients is currently preparing to issue a new bond to finance a major factory project. Analysts are speculating that w</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：C</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>选项A（辞职）：脱离（disassociation）通常是更直接、有针对性的反应，辞职是更激进的选择。在CFA标准中，往往建议先尝试脱离，而非立即辞职。... 因此，最合适的行动是脱离。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据F08×T16交叉校验，考试作答需优先检查答案正确性。该回答最终选项与参考答案“应辞职”不一致，首先构成R-FACT-1 事实错误：P1。其错误并非单纯表述差异，而是把题干中的持续性、系统性违规环境错误理解为可通过对单一事项‘脱离’解决，未把握‘老板一贯要求、合规部门也支持’这一关键前提，属于R-REA-4 前提错误：P1。同时，模型将CFA伦理中的disassociation机制泛化套用于系统性违规场景，误用了合规处置机制的适用边界，属于R-REA-6 金融概念、机制与风险收益关系误用：P1。未见额外安全合规越界输出，因此不打R-SAFE标签。回答结构清楚、论述成段，保留C-R-3与C-E-2，但不抵消核心答错，最终1分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#5</span>
+                <span class="bc-model">deepseek-v4-pro</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Were Gataki's comments about the CFA Program at the training session a violation of the Standards?
+A: No  B: Yes, with respect to exam content and difficulty  C: Yes, with respect to her performance on the exams</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：A</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>主要涉及标准VII(B)：Reference to CFA Institute, the CFA Designation, and the CFA Program。- 该标准要求会员和考生不得泄露考试的具体内容，但允许在一般层面上表达对考试的看法。- 同时，禁止做出损害CFA项目声誉或诚信的言论。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据考试作答场景的交叉校验，应优先检查知识点与答案依据是否准确。模型虽最终选项与参考答案一致，但其核心依据将考试内容保密义务错误归到 Standard VII(B)，而参考答案指出相关约束主要对应 Standard VII(A)。这已不是单纯措辞偏差，而是对考点归属的事实性错误，可能误导考生记忆与作答，故标注 R-FACT-1 为 P1。同时，模型把准则适用关系混同，并额外引入“禁止做出损害CFA项目声誉或诚信的言论”等不贴合本题核心判断的表述，属于金融合规准则机制误用，标注 R-REA-6 为 P1。虽然回答结构清晰、分析分步展开，但在考试辅导场景下，知识点归属错误会直接影响学习效果，不能仅按 P2 处理，因此最终评分为 1 分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#6</span>
+                <span class="bc-model">deepseek-v4-pro</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Umi Grabbo, CFA, is a highly regarded portfolio manager for Atlantic Advisors, a mid-sized mutual fund firm investing in domestic securities. She has watched the hedge fund boom and on numerous occasions suggested that her firm create such a fund. Senior management has refused to commit resources to</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：C</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>她未告知雇主并获其书面同意，直接违反了Standard IV(B)。虽然也涉及冲突披露，但在现存选项中，额外报酬安排更为直接且急需解决</div>
+                <div class="bc-field"><strong>💬 理由：</strong>结合F×T交叉校验，本题属于CFA伦理考试作答，必须优先检查答案正确性。模型将应适用的伦理标准判断错误，把现阶段更应归入冲突披露的问题误答为Standard IV(B) Additional Compensation Arrangements，首先构成考试答案层面的事实错误，故补充并上调R-FACT-1为主标签。与此同时，其错误地将“正在开发基金、未来可能获得管理费和业绩报酬”视为当前已形成的额外报酬安排，属于对伦理标准适用边界和机制的误用，标注R-REA-6；并且建立在“未来预期报酬=当前additional compensation arrangement已成立”的错误前提上，构成R-REA-4。回答并非空泛，论述链条相对完整，因此保留C-R-3。综合最严重问题为P1，评分1分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#7</span>
+                <span class="bc-model">glm-5.1</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Were Gataki's comments about the CFA Program at the training session a violation of the Standards?
+A: No  B: Yes, with respect to exam content and difficulty  C: Yes, with respect to her performance on the exams</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：B</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>Gataki特别提到了备考材料对“Ethics questions”没有帮助，这明确指出了考试中包含的特定主题，属于透露考试特定内容，因此违规。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>结合T16考试作答交叉校验，需优先检查答案正确性。该回答对题目选项判断结论本身出错，属R-FACT-1事实错误（P1）；其错误建立在“提到Ethics questions就等于披露保密考试内容”的错误前提之上，属R-REA-4前提错误（P1）；同时对CFA考试保密/职业操守标准的适用边界理解有误，把一般性的科目或主题提及错误归类为违规披露，属R-REA-6金融概念、机制与风险收益关系误用（P1）。回答形式上有一定结构性，因此保留C-E-2，但不影响核心错判，最终1分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#8</span>
+                <span class="bc-model">glm-5.1</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Meshack Bradovic, CFA, was recently hired as a credit analyst at a credit rating agency whose major clients include publicly listed companies on the local stock exchange. One of the clients is currently preparing to issue a new bond to finance a major factory project. Analysts are speculating that w</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：C</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>辞职是最后的手段，只有在脱离关系仍无法使自己远离违规行为，或继续留在公司可能使自己被牵连时才考虑。；在当前情况下，Bradovic可以通过脱离关系来避免违规，辞职并非最必要或最优先的步骤。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>结合F08/T16交叉校验，考试作答首先应检查答案正确性。该题标准答案指向在机构层面持续施压、合规体系失灵的情形下应辞职，而模型明确给出“辞职并非最优先步骤”的结论，与参考答案不一致，构成R-FACT-1事实错误。其错误来源在于模型将题目错误前提设定为“只要脱离当前客户/报告即可避免违规”，忽略公司层面的系统性失范与持续性风险，属于R-REA-4前提错误；同时机械套用一般性伦理处置原则，未正确适用金融职业伦理中面对机构系统性违规时应退出机构的判断标准，属于R-REA-6金融概念、机制与风险收益关系误用。经复核未发现模型输出存在R-SAFE类违法、越界或隐私安全问题，因此不加R-SAFE标签。回答结构较清晰，保留C-R-3与C-E-2，但不影响负向判定。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#9</span>
+                <span class="bc-model">glm-5.1</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Umi Grabbo, CFA, is a highly regarded portfolio manager for Atlantic Advisors, a mid-sized mutual fund firm investing in domestic securities. She has watched the hedge fund boom and on numerous occasions suggested that her firm create such a fund. Senior management has refused to commit resources to</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：C</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>最终答案：C；Grabbo开发外部对冲基金的核心动机是获取“潜在更高费用”，这明确构成了一种潜在的额外补偿安排。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据F×T交叉校验，考试作答场景需优先检查答案正确性。模型将正确答案判为C而非参考答案A，首先构成题目作答中的事实性错误，标注R-FACT-1：P1。进一步看，其错误来源于对CFA伦理准则适用边界的误用：把“开发阶段、未来可能获得更高费用”直接视为当前最应优先处理的Additional Compensation Arrangements，忽略了参考答案所强调的‘当前尚未 receiving additional compensation’这一条件，属于金融概念/机制误用，标注R-REA-6：P1。同时，模型以“未来可能有补偿”作为“当前已触发IV(B)必须优先处理”的前提推进结论，前提本身不成立，标注R-REA-4：P1。虽然最终结论错误，但回答中对选项进行了分步分析，论证结构相对完整，因此保留C-R-3。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#10</span>
+                <span class="bc-model">iquest-0509</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Were Gataki's comments about the CFA Program at the training session a violation of the Standards?
+A: No  B: Yes, with respect to exam content and difficulty  C: Yes, with respect to her performance on the exams</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：B
+
+我觉得这个分析是正确的。让我再确认一下CFA伦理标准的具体条款。
+
+根据CFA Institute的伦理标准（Code and Standards），第1条（Professionalism）中有关于&quot;Commenting on the CFA Program&quot;的规定。具体条文是：
+
+&quot;Members and Candidates must not disparage the CFA Program or its content, or disparage the CFA exams or their difficulty.&quot;
+
+Gataki的评论：
+- &quot;supplementa</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>选项C说&quot;Yes, with respect to her performance on the exams&quot;，但</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据交叉校验，考试作答场景需优先检查答案完整性与推理完整性。该回答虽然给出了最终选项，但在分析选项C时明显中断，导致关键论证未说完，既造成对该选项判断依据的缺失，也使整题解析不完整。相较于此前标注的“未闭环”，更直接、更小归因的问题是：一是题目要求对作答进行解析，但模型对选项C的分析残缺，构成R-FACT-3 信息漏答；二是论证链在关键位置断裂，构成R-REA-1 推理链缺失。由于这是考试作答场景，解析残缺会直接影响用户判断答案是否正确及学习效果，故两项均评为P1。回答整体仍有先结论后展开的基本结构，因此保留C-E-2。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#11</span>
+                <span class="bc-model">iquest-0509</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Meshack Bradovic, CFA, was recently hired as a credit analyst at a credit rating agency whose major clients include publicly listed companies on the local stock exchange. One of the clients is currently preparing to issue a new bond to finance a major factory project. Analysts are speculating that w</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>（模型未给出独立的最终答案，详见 model_reasoning）</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>模型未给出独立的最终答案；模型推理过程为空</div>
+                <div class="bc-field"><strong>💬 理由：</strong>结合交叉校验要求重新审视：本题属于金融合规/反诈相关考试作答场景，应重点检查R-SAFE、R-FACT、R-REA、V-INFO。就现有证据看，模型表现为完全未作答，未输出任何选项判断、最终结论或解析，因此首先构成R-FACT-3 信息漏答；同时答案没有形成完整交付闭环，构成V-SOL-3 未闭环；且缺乏任何必要的知识性内容与解析支撑，构成V-INFO-2 信息不足。当前没有证据显示模型输出了违法违规指导、越界金融建议或其他显性安全违规内容，因此不追加R-SAFE标签；也没有可供检验的显式推理链，较之R-REA类，更直接、最小归因仍应落在“漏答/不足/未闭环”。最严重等级为P1，故评分为1分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#12</span>
+                <span class="bc-model">iquest-0509</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>With regard to the HydraPharma recommendation downgrade, did Gataki violate the Standard relating to fair dealing?
+A: No  B: Yes, by calling Scala  C: Yes, by selling the shares held in discretionary accounts</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>（模型未给出独立的最终答案，详见 model_reasoning）</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>让我再仔细看看选项。也许正确答案是A: No。\n\n或者，也许</div>
+                <div class="bc-field"><strong>💬 理由：</strong>结合T16考试作答场景复核后，回答不仅未给出最终答案，还停留在反复自我讨论，缺少从题干、选项到结论的完整判定链条，属于推理链缺失（R-REA-1 P1）。同时，考试题要求可判卷的明确作答，但模型没有输出唯一最终选项，导致作答未闭环（V-SOL-3 P1）；对阅卷或用户使用而言，缺乏可直接采用的答案与精炼依据，构成信息不足（V-INFO-2 P1）。此外，结构上关键信息未收束到最终结论，存在关键结论不突出（E-STR-2 P2）。由于现有信息中未呈现题面标准答案，仍不足以直接判定R-FACT类答案错误，但在考试作答场景下，推理与结论缺失已构成主要问题。整体表述尚自然，保留C-E-3。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#13</span>
+                <span class="bc-model">kimi-k2.6</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Were Gataki's comments about the CFA Program at the training session a violation of the Standards?
+A: No  B: Yes, with respect to exam content and difficulty  C: Yes, with respect to her performance on the exams</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong>最终答案：A</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>适用**Standard VII(B) – Reference to CFA Institute, the CFA Designation, and the CFA Program**。</div>
+                <div class="bc-field"><strong>💬 理由：</strong>在考试作答场景下应优先核查答案正误与标准适用是否准确。该回答将主要适用标准判为VII(B)，而参考答案指出核心应为VII(A)，VII(B)仅可作为辅助说明。若题目要求判断合规性及对应适用标准，这种标准归属错误已构成作答事实性错误，属R-FACT-1 P1；同时将关于考试项目与个人经历表述的合规判断主要建立在错误标准上，属于金融专业规范适用误用，记R-REA-6 P1。虽然最终选项可能碰巧一致，但在考试题语境中，标准定位错误会直接影响得分与知识准确性，不能仅按‘深度不足’处理。回答分点清晰，因此保留C-E-2。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#14</span>
+                <span class="bc-model">claude-sonnet-4-6</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>For a given economy and a given period of time, GDP measures the:
+I: aggregate income earned by all households, all companies, and the government.  II: total income earned by all of the country’s citizens, firms, and the government.  III: total market value produced of resalable and final goods and </div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong># 结构化思维链分析
+
+##</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>【模型选项】UNKNOWN；## 最终答案：**I**</div>
+                <div class="bc-field"><strong>💬 理由：</strong>根据考试作答场景的交叉校验，应优先检查答案正确性。模型最终未给出与参考答案一致的正确选项字母，而输出“UNKNOWN”并写“最终答案：I”，直接导致作答结果错误，主标签应修正为R-FACT-1。其问题核心不只是理解偏差，而是最终答案这一客观作答结果错误。同时，“I”作为选项表达明显不符合常规单选题作答格式，且与“UNKNOWN”并存，造成答案无法被稳定识别，属于表达错误且影响理解，记R-FACT-5。模型虽有一定分析结构，但亮点不抵消考试题答错这一关键问题，故维持1分。</div>
+            </div>
+        </div>
+        <div class="badcase-card">
+            <div class="bc-header">
+                <span class="bc-num">#15</span>
+                <span class="bc-model">claude-sonnet-4-6</span>
+                <span class="bc-score" style="background:#D97706">1分 · P1</span>
+                <span class="bc-tag"></span>
+            </div>
+            <div class="bc-body">
+                <div class="bc-field"><strong>❓ 题目：</strong>Given the demand function for Organic Coffee:
+$$Q_{coffee}^d = 5.7 - 1.3P_{coffee} + 0.03I - 0.03P_{tea}$$
+where
+- **Q_{coffee}^d** = the quantity demanded of Organic Coffee
+- **P_{coffee}** = the price per unit of Organic Coffee
+- **I** = average household disposable income
+- **P_{tea}** = the pric</div>
+                <div class="bc-field"><strong>🤖 模型回答：</strong># 结构化推演
+
+##
+
+最终答案：A
+
+$P_{tea}$（优质茶叶价格）的变化是导致有机咖啡需求曲线**移动**的最可能原因，因为它属于影响需求的**非价格因素**（替代品价格），会使整条需求曲线发生平移。</div>
+                <div class="bc-field"><strong>✅ 参考：</strong></div>
+                <div class="bc-field bc-evidence"><strong>🔍 证据：</strong>系数为 -0.03，P_tea 上升 → Q_{coffee}^d 下降（说明茶与咖啡为替代品关系，符合经济逻辑）</div>
+                <div class="bc-field"><strong>💬 理由：</strong>经 F×T 交叉校验，作为 T16 考试作答场景，应从答案正确性与推理正确性从严评估。该回答虽然最终选项可能与参考答案一致，但对交叉价格效应的经济含义作出错误解释：若茶价格上升导致咖啡需求下降，更对应互补关系而非替代关系，属于概念/机制误用（R-REA-6）。在考试作答中，错误推理会直接影响知识掌握与解题依据，不能仅因最终选项正确而降为“无需修改”的 P2，应上调为 P1。未见明确事实编造或计算错误；结构尚清晰，因此保留 C-E-2。</div>
+            </div>
+        </div>
+
+    <div class="footer">
+        RVEC 打标分析报告 · eval-dataset-tagging skill · 2026-06-16 13:51:45
+    </div>
+</div>
+</body></html>

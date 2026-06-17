@@ -1,0 +1,26 @@
+mode: error_attribution
+output_format: jsonl
+retry_limit: 3
+
+badcase_filter: "accuracy == 0"
+
+error_schema:
+  - name: "知识缺失"
+    description: "模型不具备回答所需的知识"
+  - name: "幻觉"
+    description: "模型输出了不存在或与事实相反的内容"
+  - name: "推理错误"
+    description: "知识具备但推理链出错"
+  - name: "指令遵循失败"
+    description: "模型未按照题目或系统提示的格式/约束要求输出"
+  - name: "计算错误"
+    description: "数值计算过程出错"
+  - name: "其他"
+    description: "无法归入以上类别"
+
+severity_schema:
+  scale: [1, 2, 3]
+  labels:
+    1: "轻微"
+    2: "中等"
+    3: "严重"

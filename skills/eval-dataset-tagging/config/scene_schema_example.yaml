@@ -1,0 +1,41 @@
+mode: scene_labeling
+output_format: jsonl
+retry_limit: 3
+
+scene_schema:
+  - dimension: "所属领域"
+    tree:
+      - l1: "金融"
+        children:
+          - l2: "银行"
+            children:
+              - l3: "零售银行"
+              - l3: "对公银行"
+          - l2: "保险"
+            children:
+              - l3: "寿险"
+              - l3: "财险"
+      - l1: "医疗"
+        children:
+          - l2: "临床"
+            children:
+              - l3: "诊断"
+              - l3: "治疗"
+
+  - dimension: "题目类型"
+    tree:
+      - l1: "分析题"
+        children:
+          - l2: "原因分析"
+            children:
+              - l3: "单因素"
+              - l3: "多因素"
+          - l2: "对比分析"
+            children:
+              - l3: "优劣对比"
+      - l1: "计算题"
+        children:
+          - l2: "数值计算"
+            children:
+              - l3: "简单运算"
+              - l3: "复合运算"

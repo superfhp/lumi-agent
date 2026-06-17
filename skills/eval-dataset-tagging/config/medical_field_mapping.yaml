@@ -1,0 +1,141 @@
+# ═════════════════════════════════════════════════════════════════════
+# 医学 RVEC 打标 · eval_skill 输出字段映射指南
+#
+# 说明：
+#   eval_skill 的 `cli run` 输出 outputs/<experiment>/samples.csv
+#   本文件描述 samples.csv 列名如何被 eval-dataset-tagging 自动映射
+#
+# 使用方式：
+#   python run_tagging.py --mode med_rvec \
+#       --config config/medical_rvec_config.yaml \
+#       --input <eval_skill_samples.csv> \
+#       --auto
+# ═════════════════════════════════════════════════════════════════════
+
+# ── eval_skill samples.csv 标准列名（由 eval_skill reporter=csv 写出）──
+# 这些列名会被 eval-dataset-tagging 的 field_mapping.py 自动识别：
+#
+#   sample_id          → 用作唯一 ID（组合 norm_task_from_filename 推断 family）
+#   input              → 映射到 question / context
+#   expected_output    → 映射到 ground_truth_structured
+#   model_response     → 映射到 model_response / answer
+#   model              → 模型名称（用于输出列）
+#   score              → 映射到 Accuracy
+#   judge_comment      → 映射到 judge_comment（JSON 格式，含 RVEC step 详情）
+#   metadata           → 映射到 metadata（可提取 dataset_key 用于 family 路由）
+
+# ── 直接来自 gen_medical_responses.py 的 CSV 列名 ──
+# 如果直接用 gen_medical_responses.py 的输出 CSV（Phase 1 产物），
+# 字段映射如下：
+#
+#   session_id         → 唯一 ID
+#   prompt             → question / context
+#   reference_answer   → ground_truth_structured
+#   【模型名】- answer → model_response（需要展开为单模型单行格式）
+#   type               → 用于 schema 推断（单选/多选）
+#   department/unit    → 可作为 metadata 辅助 family 路由
+
+# ── 字段映射优先级（eval-dataset-tagging 自动识别）──
+field_mapping:
+  question:
+    priority:
+      - "prompt"
+      - "question"
+      - "query"
+      - "题目"
+      - "问题"
+    note: "用户问题/题干"
+
+  context:
+    priority:
+      - "input"
+      - "context"
+      - "full_context"
+      - "输入"
+      - "题干"
+    note: "完整上下文（含选项、背景）"
+
+  model_response:
+    priority:
+      - "model_response"
+      - "output"
+      - "answer"
+      - "response"
+      - "实际回答"
+    note: "模型回答"
+
+  ground_truth_structured:
+    priority:
+      - "expected_output"
+      - "ground_truth_structured"
+      - "reference_answer"
+      - "参考答案"
+      - "reference"
+      - "gold"
+    note: "结构化参考答案"
+
+  accuracy:
+    priority:
+      - "score"
+      - "Accuracy"
+      - "accuracy"
+      - "评分"
+    note: "原始客观评分（0/1 或 0-4）"
+
+  judge_comment:
+    priority:
+      - "judge_comment"
+      - "judge_reason"
+    note: "JSON 格式评测细节"
+
+  model_choice:
+    priority:
+      - "model_choice"
+      - "picked_choice"
+    note: "选择题：模型选的选项"
+
+  rubric:
+    priority:
+      - "rubric"
+      - "key point"
+      - "key_point"
+      - "评分要点"
+    note: "评分要点（药品集特有）"
+
+  norm_task_from_filename:
+    priority:
+      - "norm_task_from_filename"
+      - "dataset_key"
+      - "metadata.dataset_key"
+    note: "用于 family 路由的任务标识"
+    fallback_rule: |
+      如果字段不存在，按以下规则从文件名/metadata推断：
+        - 文件名含 "exam" → "Medical-Exam-Eval"
+        - 文件名含 "drug" → "Medical-Drug-Eval"
+        - 文件名含 "xj" 或 "qa" → "Medical-XJ-QEval"
+        - metadata.schema = "single_choice" / "multi_choice" → "Medical-Exam-Eval"
+        - 否则 → "_default_" （走 GENERIC_MEDICAL）
+
+# ── 数据预处理建议 ──
+preprocessing_notes:
+  - name: "eval_skill samples.csv 格式"
+    description: |
+      eval_skill 输出的 samples.csv 是"每个 (sample_id, model, round) 一行"的长格式，
+      可直接被 run_tagging.py 消费，无需额外转换。
+      每行包含：sample_id, model, input, expected_output, model_response, score, judge_comment, metadata
+
+  - name: "gen_medical_responses.py CSV 格式"
+    description: |
+      gen_medical_responses.py 输出的 medical_qa_with_responses__*.csv 是"宽格式"：
+      一行一题，每个模型占 5 列（answer/bad_tags/good_tags/DCG_score/DCG_note）。
+      使用前需要"展平"为长格式（一行一个模型回答）。
+      可用以下命令转换：
+        python run_tagging.py --mode med_rvec --input medical_qa_with_responses__exam.csv --pivot-wide
+
+  - name: "norm_task_from_filename 注入"
+    description: |
+      如果输入 CSV 没有 norm_task_from_filename 列，run_tagging.py 会尝试从：
+        1. metadata.dataset_key（如 "exam" → "Medical-Exam-Eval"）
+        2. 文件名关键词推断
+        3. metadata.schema 字段推断
+      如果都失败，fallback 到 GENERIC_MEDICAL family。

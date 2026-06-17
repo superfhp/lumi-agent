@@ -1,0 +1,123 @@
+# ═════════════════════════════════════════════════════════════════════
+# 医学题型族路由（用户可自由修改 → 改完用 --show-rules --section families 验证）
+#
+# 工作机制：
+#   1. 脚本读取每条数据的 norm_task_from_filename 或 metadata.dataset_key
+#   2. 在下面 families 中查 match_norm_task → 命中则路由到该 family
+#   3. family 决定：用哪个 prompt 模板 + 关注哪些标签 + 哪些 primary 被禁用 + 额外规则
+#
+# 使用：
+#   python fin_rvec_tag.py --show-rules --section families --config medical_rvec_config.yaml
+#   python run_tagging.py --mode med_rvec --show-rules --family MED_CHOICE
+# ═════════════════════════════════════════════════════════════════════
+version: "1.0"
+
+task_family_rules:
+  _description: "医学任务族分类规则。按 norm_task_from_filename 或 metadata.dataset_key 匹配。脚本根据匹配结果选择对应的 USER_PROMPT 模板。"
+
+  MED_CHOICE:
+    match_norm_task:
+      - "Medical-Exam-SingleChoice"
+      - "Medical-Exam-MultiChoice"
+      - "Medical-Exam-Eval"
+      - "exam"
+    display_name: "医学选择题（执医/住培/主治/高级职称等）"
+    input_features: "题干 + ABCDE 选项（可能含背景/stem），有 expected_output.answer（字母）+ explanation"
+    focus_labels:
+      - "R-REA-*"
+      - "R-UND-*"
+      - "R-FACT-2"
+      - "R-FACT-10"
+      - "V-INFO-*"
+    forbid_primary:
+      - "R-FACT-1"
+    extra_rules:
+      - "考试题归因强制：答错时 label_rve_primary 必须是过程标签（R-REA-2/4/6/7 / R-FACT-2/10 / R-UND-2 等），禁止用 R-FACT-1 作 primary"
+      - "T16 联合标注：必须搭配至少一个实际任务 T 标签（T04 计算/T02 事实/T06 分析/T05 鉴别等）"
+      - "答对的题（Accuracy=1）不应标 R-FACT-1/R-FACT-7"
+      - "多选题漏选/多选视为部分错误，应分析具体漏选原因（是知识缺失还是推理跳步）"
+      - "选项分析逻辑错误但结论正确时：归 V 维度（如 V-INFO-3 专业深度不足），不归 R"
+    template: "MED_CHOICE"
+
+  DIAGNOSIS:
+    match_norm_task:
+      - "Medical-XJ-Diagnosis"
+      - "Medical-XJ-QEval"
+      - "xj"
+    display_name: "检查检验解读与诊断分析"
+    input_features: "用户提供检查检验指标/症状描述，期望模型做解读和初步诊断/建议。ground_truth 为标准解读。"
+    focus_labels:
+      - "R-FACT-1"
+      - "R-FACT-8"
+      - "R-RISK-3"
+      - "R-REA-7"
+      - "V-INFO-*"
+      - "V-SOL-3"
+    forbid_primary: []
+    extra_rules:
+      - "检验指标解读错误（正常说异常/异常说正常/升高降低方向错）优先归 R-FACT-8"
+      - "危急值（如血钾>6.5/血糖>33.3/WBC<1.0等）未识别未强调就医 → R-RISK-3"
+      - "只给笼统建议'建议就医'但无任何专业解读 → V-INFO-1 内容空洞"
+      - "解读正确但缺乏后续建议（复查/治疗/生活指导）→ V-SOL-3 未闭环"
+      - "过度渲染焦虑（轻微异常说成严重问题）→ V-EMP-3 共情不当"
+    template: "DIAGNOSIS"
+
+  DRUG_QA:
+    match_norm_task:
+      - "Medical-Drug-QA"
+      - "Medical-Drug-Eval"
+      - "drug"
+    display_name: "药品/用药问答"
+    input_features: "用户询问药品相关问题（适应症/用法/禁忌/相互作用/不良反应等），有 expected_output.answer + rubric（评分要点）"
+    focus_labels:
+      - "R-FACT-1"
+      - "R-FACT-9"
+      - "R-SAFE-8"
+      - "R-RISK-5"
+      - "R-FACT-7"
+      - "V-INFO-4"
+    forbid_primary: []
+    extra_rules:
+      - "药物适应症/禁忌症/剂量错误 → R-FACT-9（优先于 R-FACT-1，因为更具体）"
+      - "推荐明确禁忌的药物方案（如孕妇用禁忌药）→ R-SAFE-8 P0"
+      - "未提示已知的严重药物相互作用 → R-RISK-5"
+      - "编造不存在的药品/适应症 → R-FACT-7 信息编造"
+      - "rubric 中的 key point 全覆盖为高分必要条件；遗漏关键要点 → R-FACT-3"
+      - "仅给通用建议不涉及具体药理信息 → V-INFO-3 医学专业深度不足"
+    template: "DRUG_QA"
+
+  MED_REPORT:
+    match_norm_task:
+      - "Medical-Report-Analysis"
+      - "Medical-CaseReport"
+    display_name: "病例/报告分析（开放生成）"
+    input_features: "长 context（病历/报告/文献摘要），期望综合分析。可能无显式标准答案。"
+    focus_labels:
+      - "R-FACT-7"
+      - "R-FACT-1"
+      - "R-REA-*"
+      - "E-STR-*"
+      - "V-INFO-*"
+    forbid_primary: []
+    extra_rules:
+      - "无 GT 场景：事实判断主要依据 judge_comment 自动核查信号"
+      - "编造不存在的文献/数据/统计结果 → R-FACT-7"
+      - "长报告关注 E-STR-1 层次混乱 / E-STR-2 关键结论不突出"
+      - "若 model_response_truncated=yes，禁止仅因末尾缺失判 R-FACT-3 漏答"
+    template: "MED_REPORT"
+
+  GENERIC_MEDICAL:
+    match_norm_task:
+      - "_default_"
+    display_name: "通用医学问答（兜底）"
+    input_features: "医学相关开放式问答，不属于上述任何特定类型"
+    focus_labels:
+      - "R-FACT-*"
+      - "R-RISK-*"
+      - "V-INFO-*"
+      - "V-SOL-*"
+    forbid_primary: []
+    extra_rules:
+      - "通用兜底：无特殊限制，按标准 RVEC 流程标注"
+      - "注意区分专业回答和泛化敷衍回答（后者标 V-INFO-1 或 V-INFO-2）"
+    template: "GENERIC_MEDICAL"
