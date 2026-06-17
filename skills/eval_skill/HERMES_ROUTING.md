@@ -55,11 +55,8 @@ python -m eval_skill.cli list-datasets --domain <domain>
 # Step 2：用户选 dataset 后，预览 5 条
 python -m eval_skill.cli preview-dataset --name <用户选择的dataset> --limit 5
 
-# Step 2 输出要求：必须保留 expected_signals 的中文化结果（tag_id + 中文名），例如：
-#   R-FACT-3 时效错误
-#   V-EXE-1 字数约束未遵循
-# pack 查不到时按 CLI 原样显示 `tag_id (未知)`。
-# 禁止摘要成只有 `R-FACT-3、V-EXE-1`。
+# Step 2 输出要求：展示样例的 category、prompt、answer/rubric，不展示预期信号。
+# CLI 末尾输出的「🔗 查看全量评测集」链接必须一并转发给用户。
 # 预览后停下等待用户确认是否继续第 3 步。
 
 # Step 3：展示评测配置和规则，不执行
@@ -77,10 +74,13 @@ python -m eval_skill.cli upload-dataset --file <file> --name <dataset> --dry-run
 python -m eval_skill.cli run -c <yaml>
 
 # cli run 默认会确保 reporter 至少包含 csv+lumi；只有本地调试时才允许 --no-lumi。
-# Step 5 输出要求：必须把 samples.csv 路径、summary.json 路径、Lumi trace/experiment run 状态回传给用户。
-# 如果 metric 是 rvec_judge，还必须确认 Lumi trace 中有 step 级 observation/span：
-# step1_understand / step2_R / step2_V / step2_E / step2_C / aggregate / step3_scoring，
-# 并且 trace output/CSV 中能看到 bad_tags_json / good_tags_json。
+# Step 5 输出要求：
+# - 必须抬 samples.csv 路径、summary.json 路径
+# - 必须转发 CLI 输出的评测结果表格（question / expected / actual / score / reason）
+# - 必须转发 CLI 输出的 Langfuse 实验结果链接（🔗）
+# - 如果 metric 是 rvec_judge，还必须确认 Lumi trace 中有 step 级 observation/span：
+#   step1_understand / step2_R / step2_V / step2_E / step2_C / aggregate / step3_scoring，
+#   并且 trace output/CSV 中能看到 bad_tags_json / good_tags_json。
 ```
 
 ## 用户确认清单

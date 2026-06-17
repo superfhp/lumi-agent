@@ -58,6 +58,15 @@ class Reporter:
     # ---------------- record ----------------
     def record(self, sample: Sample, model: ModelSpec, round_idx: int,
                output: RunOutput, metrics: List[MetricResult]) -> None:
+        # 提取问题文本供结果表格展示
+        question = (
+            sample.prompt
+            or sample.fields.get("prompt")
+            or sample.fields.get("question")
+            or (sample.turns[0].content if sample.turns else "")
+            or sample.sample_id
+        )
+        expected_answer = str(sample.ground_truth.answer) if sample.ground_truth.answer is not None else ""
         row: Dict[str, Any] = {
             "experiment_name": self.cfg.experiment_name,
             "tags": ";".join(self.cfg.tags),
@@ -67,6 +76,8 @@ class Reporter:
             "run_prefix": model.trace_label(),
             "host_profile": model.host_profile,
             "sample_id": sample.sample_id,
+            "question": question,
+            "expected_answer": expected_answer,
             "schema": sample.schema,
             "turn_kind": sample.turn_kind,
             "scoring_mode": sample.scoring_mode,
@@ -95,17 +106,35 @@ class Reporter:
     def _push_lumi(self, sample, model, round_idx, output, metrics):
         try:
             run_name = self._lumi_run_name(model, round_idx)
+
+            # trace input：多轮时把每轮 user 文本都带上
+            trace_input: Dict[str, Any] = {
+                "sample_id": sample.sample_id,
+                "schema": sample.schema,
+                "turn_kind": sample.turn_kind,
+                "scoring_mode": sample.scoring_mode,
+                **sample.fields,
+            }
+            if sample.has_turns:
+                trace_input["turns"] = [t.content for t in sample.turns]
+
+            # trace output：多轮时展示完整对话，不只最后一轮
+            if len(output.turns) > 1:
+                trace_output = {
+                    "conversation": [
+                        {"turn": i, "user": t.prompt, "assistant": t.content}
+                        for i, t in enumerate(output.turns)
+                    ],
+                    "final_answer": output.final_text,
+                }
+            else:
+                trace_output = {"prediction": output.final_text, "reasoning": output.final_reasoning}
+
             trace = self._lumi.trace(
                 name=self.cfg.experiment_name,
                 session_id=run_name,
-                input={
-                    "sample_id": sample.sample_id,
-                    "schema": sample.schema,
-                    "turn_kind": sample.turn_kind,
-                    "scoring_mode": sample.scoring_mode,
-                    **sample.fields,
-                },
-                output={"prediction": output.final_text, "reasoning": output.final_reasoning},
+                input=trace_input,
+                output=trace_output,
                 metadata={
                     "tested_model": model.model,
                     "run_prefix": model.trace_label(),
@@ -146,24 +175,26 @@ class Reporter:
 
     def _push_lumi_generation(self, trace: Any, sample: Sample,
                               model: ModelSpec, output: RunOutput) -> None:
-        """可选写一条 generation，便于 Lumi trace 里看到模型输出节点。"""
+        """每轮对话写一个 generation，多轮时能在 Lumi trace 里看到完整对话流。"""
         if not hasattr(trace, "generation"):
             return
-        try:
-            gen = trace.generation(
-                name="model_response",
-                model=model.model,
-                input={"sample_id": sample.sample_id},
-            )
-            if hasattr(gen, "end"):
-                gen.end(output={
-                    "prediction": output.final_text,
-                    "reasoning": output.final_reasoning,
-                    "usage": output.total_usage(),
-                    "error": output.error or "",
-                })
-        except Exception as e:
-            print(f"[reporter] lumi generation 写入失败 sample={sample.sample_id}: {e}")
+        for i, turn in enumerate(output.turns):
+            turn_name = f"turn_{i}" if len(output.turns) > 1 else "model_response"
+            try:
+                gen = trace.generation(
+                    name=turn_name,
+                    model=model.model,
+                    input={"sample_id": sample.sample_id, "turn": i, "user": turn.prompt},
+                )
+                if hasattr(gen, "end"):
+                    gen.end(output={
+                        "content": turn.content,
+                        "reasoning": turn.reasoning,
+                        "usage": turn.usage,
+                        "finish_reason": turn.finish_reason,
+                    })
+            except Exception as e:
+                print(f"[reporter] lumi generation 写入失败 sample={sample.sample_id} turn={i}: {e}")
 
     def _push_metric_observations(self, trace: Any, metrics: List[MetricResult]) -> None:
         """把 metric 暴露的 step 级信息写入 Lumi trace。
@@ -209,15 +240,21 @@ class Reporter:
 
     def _update_lumi_trace_output(self, trace: Any, output: RunOutput,
                                   metrics: List[MetricResult]) -> None:
-        """更新 trace output，让 Lumi 详情页直接看到 bad/good tags 与 step JSON。"""
+        """更新 trace output，让 Lumi 详情页直接看到完整对话与 metric 详情。"""
         if not hasattr(trace, "update"):
             return
         try:
-            trace.update(output={
-                "prediction": output.final_text,
-                "reasoning": output.final_reasoning,
-                "metrics": self._metric_output_payload(metrics),
-            })
+            out: Dict[str, Any] = {"metrics": self._metric_output_payload(metrics)}
+            if len(output.turns) > 1:
+                out["conversation"] = [
+                    {"turn": i, "user": t.prompt, "assistant": t.content}
+                    for i, t in enumerate(output.turns)
+                ]
+                out["final_answer"] = output.final_text
+            else:
+                out["prediction"] = output.final_text
+                out["reasoning"] = output.final_reasoning
+            trace.update(output=out)
         except Exception as e:
             print(f"[reporter] lumi trace output 更新失败: {str(e)[:120]}")
 
@@ -303,7 +340,70 @@ class Reporter:
                 pass
         print(f"[reporter] CSV 已写入: {csv_path}")
         print(f"[reporter] summary 已写入: {self.exp_dir / 'summary.json'}")
+
+        # 评测结果表格
+        self._print_results_table(existing_rows + self.rows)
+
+        # Langfuse 实验链接
+        self._print_experiment_link()
+
         return csv_path
+
+    # ---------------- results table ----------------
+    def _print_results_table(self, rows: List[Dict[str, Any]]) -> None:
+        """Print a markdown-style results table to stdout."""
+        if not rows:
+            return
+        metric_cols = [m.column_name for m in self.cfg.metrics]
+        # 取第一个 metric 作为主分数列
+        main_metric = metric_cols[0] if metric_cols else None
+
+        def _t(s: str, n: int = 40) -> str:
+            if not s:
+                return ""
+            s = s.replace("\n", " ").replace("\r", " ").replace("|", "/").strip()
+            return s if len(s) <= n else s[:n - 1] + "…"
+
+        print(f"\n{'=' * 70}")
+        print(f"评测结果明细（共 {len(rows)} 条）")
+        print("=" * 70)
+        print(f"| # | question | expected | actual | score | reason |")
+        print(f"|---|----------|----------|--------|-------|--------|")
+        for i, r in enumerate(rows, 1):
+            q = _t(str(r.get("question", r.get("sample_id", ""))), 30)
+            exp = _t(str(r.get("expected_answer", "")), 20)
+            act = _t(str(r.get("prediction", "")), 25)
+            score = ""
+            reason = ""
+            if main_metric:
+                sv = r.get(f"{main_metric}_value", "")
+                score = str(sv) if sv not in (None, "") else ""
+                reason = _t(str(r.get(f"{main_metric}_reason", "")), 30)
+            print(f"| {i} | {q} | {exp} | {act} | {score} | {reason} |")
+        # 均分汇总
+        if main_metric:
+            vals = []
+            for r in rows:
+                v = r.get(f"{main_metric}_value")
+                if v not in (None, ""):
+                    try:
+                        vals.append(float(v))
+                    except (TypeError, ValueError):
+                        pass
+            if vals:
+                import statistics as _st
+                mean = round(_st.fmean(vals), 4)
+                print(f"\n{main_metric} 均分: {mean}（{len(vals)} 条有效）")
+
+    # ---------------- experiment link ----------------
+    def _print_experiment_link(self) -> None:
+        """Print a Langfuse/Lumi experiment link if LUMI_HOST is configured."""
+        import os
+        host = os.environ.get("LUMI_HOST", "").rstrip("/")
+        if not host:
+            return
+        ds_name = self.cfg.dataset.name
+        print(f"\n🔗 Langfuse 实验结果: {host}/datasets/{ds_name}")
 
     def _aggregate(self, rows: List[Dict[str, Any]]):
         groups: Dict[Tuple[str, str, int], List[Dict[str, Any]]] = {}

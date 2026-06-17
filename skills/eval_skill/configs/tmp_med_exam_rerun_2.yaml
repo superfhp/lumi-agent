@@ -1,0 +1,34 @@
+experiment_name: medical_exam_rerun_2_after_reupload
+tags: [medical, exam, rerun]
+description: 重跑 Medical-Exam-Eval 指定2条样本，验证 Lumi 侧重传后是否恢复
+
+dataset:
+  name: Medical-Exam-Eval
+
+sampling:
+  mode: n
+  n: 2
+  seed: 42
+
+prompt_strategy:
+  user_template: |
+    {prompt}
+
+model_under_test:
+  host_profile: sota
+  model: claude-sonnet-4
+  run_prefix: claude-sonnet-4-rerun
+
+judge:
+  host_profile: sota
+  model: claude-sonnet-4
+  temperature: 0
+
+metrics:
+  - name: accuracy
+
+execution:
+  rounds: 1
+  concurrency: 2
+  reporter: [csv]
+  resume: false

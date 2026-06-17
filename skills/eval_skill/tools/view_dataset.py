@@ -260,7 +260,6 @@ def render_one(it: Dict[str, Any], idx: int, total: int,
     turn_kind, scoring_mode = _resolve_kind_mode(meta, inp)
     level = inp.get("level") or meta.get("level") or ""
     turn = inp.get("turn") or meta.get("turn") or ""
-    sig_human = _humanize_signals(meta.get("expected_signals"), tag_to_name)
 
     lines = []
     lines.append(f"┌─ [{idx}/{total}] id={it['id']}")
@@ -277,13 +276,6 @@ def render_one(it: Dict[str, Any], idx: int, total: int,
     else:
         lines.append(f"│  prompt: {_trunc(prompt, 200)}")
 
-    if sig_human:
-        lines.append(f"│  📍 expected_signals:")
-        for s in sig_human:
-            lines.append(f"│       • {s}")
-    else:
-        lines.append(f"│  📍 expected_signals: (空)")
-
     ans = eo.get("answer")
     if ans:
         if isinstance(ans, str):
@@ -297,10 +289,7 @@ def render_one(it: Dict[str, Any], idx: int, total: int,
         lines.append(f"│  📋 rubric: {_trunc(rub_str, 150)}")
 
     if _is_empty_expected(eo):
-        if meta.get("expected_signals"):
-            lines.append(f"│  ℹ️  expected_output 空；metadata.expected_signals 已填，可用于 RVEC 预期信号对照")
-        else:
-            lines.append(f"│  ⚠️  expected_output 完全为空（出题方还没填）")
+        lines.append(f"│  ⚠️  expected_output 为空")
 
     lines.append("└" + "─" * 68)
     return "\n".join(lines)
@@ -316,29 +305,9 @@ def render_summary(items: List[Dict[str, Any]], tag_to_name: Dict[str, str]) -> 
     turn_cnt = Counter(_resolve_kind_mode(it["metadata"], it["input"])[0] for it in items)
     score_cnt = Counter(_resolve_kind_mode(it["metadata"], it["input"])[1] for it in items)
 
-    has_signals = sum(1 for it in items if it["metadata"].get("expected_signals"))
     has_answer = sum(1 for it in items if it["expected_output"].get("answer"))
     has_rubric = sum(1 for it in items if it["expected_output"].get("rubric"))
     empty_eo = sum(1 for it in items if _is_empty_expected(it["expected_output"]))
-    empty_eo_with_signals = sum(
-        1 for it in items
-        if _is_empty_expected(it["expected_output"]) and it["metadata"].get("expected_signals")
-    )
-
-    # 信号 top 10（中文化）
-    sig_freq: Counter = Counter()
-    unknown_tags: Counter = Counter()
-    for it in items:
-        sigs = it["metadata"].get("expected_signals") or []
-        if isinstance(sigs, str):
-            import re
-            sigs = [s.strip() for s in re.split(r"[,/、\s]+", sigs) if s.strip()]
-        for tag in sigs:
-            tag = str(tag).strip()
-            if tag in tag_to_name:
-                sig_freq[f"{tag} {tag_to_name[tag]}"] += 1
-            else:
-                unknown_tags[tag] += 1
 
     lines = []
     lines.append("=" * 70)
@@ -364,23 +333,10 @@ def render_summary(items: List[Dict[str, Any]], tag_to_name: Dict[str, str]) -> 
 
     lines.append(f"\n[字段填充率]")
     n = len(items)
-    lines.append(f"  metadata.expected_signals: {has_signals}/{n}")
     lines.append(f"  expected_output.answer:    {has_answer}/{n}")
     lines.append(f"  expected_output.rubric:    {has_rubric}/{n}")
     if empty_eo:
         lines.append(f"  expected_output 完全为空: {empty_eo}/{n}")
-        if empty_eo_with_signals:
-            lines.append(f"    其中 metadata.expected_signals 已填: {empty_eo_with_signals}/{empty_eo}（RVEC 可继续用于预期信号对照）")
-
-    if sig_freq:
-        lines.append(f"\n[预期信号 top 10（中文化）]")
-        for sig, n in sig_freq.most_common(10):
-            lines.append(f"  {sig:40s} {n}")
-
-    if unknown_tags:
-        lines.append(f"\n⚠️  以下 {len(unknown_tags)} 个 tag_id 在 pack 里查不到（pack 升级或拼写错误）：")
-        for tag, n in unknown_tags.most_common():
-            lines.append(f"  {tag} (出现 {n} 次)")
 
     return "\n".join(lines)
 
@@ -396,12 +352,10 @@ def export_csv(items: List[Dict[str, Any]], path: Path,
         w.writerow([
             "id", "category", "turn_kind", "scoring_mode", "schema", "level", "turn",
             "prompt", "answer", "rubric",
-            "expected_signals_中文",
             "expected_output_为空",
         ])
         for it in items:
             inp = it["input"]; eo = it["expected_output"]; meta = it["metadata"]
-            sigs_human = _humanize_signals(meta.get("expected_signals"), tag_to_name)
             tk, sm = _resolve_kind_mode(meta, inp)
             w.writerow([
                 it["id"],
@@ -413,7 +367,6 @@ def export_csv(items: List[Dict[str, Any]], path: Path,
                 _input_oneline(inp),
                 eo.get("answer") or "",
                 eo.get("rubric") or "",
-                " | ".join(sigs_human),
                 "是" if _is_empty_expected(eo) else "",
             ])
 
@@ -433,7 +386,6 @@ def export_markdown(items: List[Dict[str, Any]], path: Path,
         cat = inp.get("category") or meta.get("category") or "(无)"
         prompt = inp.get("prompt") or inp.get("question") or ""
         turns = _extract_turns(inp)
-        sigs_human = _humanize_signals(meta.get("expected_signals"), tag_to_name)
 
         lines.append(f"### {idx}. `{it['id']}` — {cat}\n")
         tk, sm = _resolve_kind_mode(meta, inp)
@@ -450,10 +402,6 @@ def export_markdown(items: List[Dict[str, Any]], path: Path,
         else:
             lines.append(f"- **prompt**:")
             lines.append(f"  > {prompt[:500]}")
-        if sigs_human:
-            lines.append(f"- **expected_signals**:")
-            for s in sigs_human:
-                lines.append(f"  - {s}")
         if eo.get("answer"):
             ans = eo['answer']
             ans_s = ans if isinstance(ans, str) else json.dumps(ans, ensure_ascii=False)
@@ -463,10 +411,7 @@ def export_markdown(items: List[Dict[str, Any]], path: Path,
             rub_s = rub if isinstance(rub, str) else json.dumps(rub, ensure_ascii=False)
             lines.append(f"- **rubric**: {rub_s[:300]}")
         if _is_empty_expected(eo):
-            if meta.get("expected_signals"):
-                lines.append(f"- ℹ️ **expected_output 空；metadata.expected_signals 已填，可用于 RVEC 预期信号对照**")
-            else:
-                lines.append(f"- ⚠️ **expected_output 完全为空**")
+            lines.append(f"- ⚠️ **expected_output 为空**")
         lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -507,6 +452,7 @@ def main():
         tag_to_name = {}
 
     # 读 dataset
+    lumi_dataset_name: Optional[str] = None
     if args.from_jsonl:
         raw = _read_jsonl(Path(args.from_jsonl))
         print(f"[view] 读取 jsonl: {args.from_jsonl}（{len(raw)} 条）")
@@ -514,6 +460,7 @@ def main():
         client = build_lumi_client()
         ds = client.get_dataset(args.source)
         raw = list(ds.items)
+        lumi_dataset_name = args.source
         print(f"[view] 读取 lumi dataset: {args.source!r}（{len(raw)} 条）")
 
     items = [_normalize_one(it) for it in raw]
@@ -556,6 +503,13 @@ def main():
     if args.md:
         export_markdown(filtered, Path(args.md), tag_to_name, summary)
         print(f"[view] 导出 markdown → {args.md}")
+
+    # 全量评测集链接
+    if lumi_dataset_name:
+        import os
+        host = os.environ.get("LUMI_HOST", "").rstrip("/")
+        if host:
+            print(f"\n🔗 查看全量评测集: {host}/datasets/{lumi_dataset_name}")
 
 
 if __name__ == "__main__":

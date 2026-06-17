@@ -36,29 +36,87 @@ def _normalize(s: str, normalizer: str, case_sensitive: bool) -> str:
 # ============================================================================
 # accuracy 答案抽取
 # ============================================================================
-_CN_FINAL_RE = re.compile(r"最终答案[是为：:]?\s*\(?([A-Za-z])\)?")
+# ── 主模式：行首 "答案：X" / "答案：BCDE" / "答案：A,C,D" ──
+# 医学/金融选择题模型几乎都遵循此格式
+_CN_ANSWER_LINE_RE = re.compile(
+    r"^\s*答案\s*[：:]\s*([A-Ea-e](?:[,，、\s]*[A-Ea-e])*)",
+    re.MULTILINE,
+)
+# ── 次模式："最终答案是X" / "最终答案为ABCD" ──
+_CN_FINAL_RE = re.compile(
+    r"最终答案\s*[是为：:]?\s*\(?([A-Ea-e](?:[,，、\s]*[A-Ea-e])*)\)?",
+)
+# ── 变体模式 ──
+_CN_ANSWER_VARIANT_PATTERNS = [
+    re.compile(r"(?:答案|正确答案|正确选项)\s*(?:是|为|应选|应该选)\s*[：:]?\s*([A-Ea-e](?:[,，、\s]*[A-Ea-e])*)"),
+    re.compile(r"(?:综上|因此|所以)[^。]{0,30}?(?:选|答案[是为]?)\s*([A-Ea-e](?:[,，、\s]*[A-Ea-e])*)"),
+]
+# ── English ──
 _EN_THE_ANSWER_RE = re.compile(r"the\s+answer\s+is\s*\*?\*?\(?([A-Za-z])\)?", re.IGNORECASE)
+# ── 最后手段（仅对短文本启用，避免在长文本中误抓分析段的字母） ──
 _LAST_LETTER_RE = re.compile(r"\b([A-Za-z])\b")
+
+# 短文本阈值：仅当全文 < 此长度时才使用 last_letter fallback
+_SHORT_TEXT_THRESHOLD = 200
+
+
+def _normalize_choice_letters(raw: str) -> str:
+    """从原始捕获组中提取所有选项字母，排序去重后拼接（无分隔符）。
+
+    例：'B,C,D,E' → 'BCDE'；'ACD' → 'ACD'；'A、C、D' → 'ACD'
+    """
+    letters = re.findall(r"[A-Ea-e]", raw)
+    if letters:
+        return "".join(sorted({c.upper() for c in letters}))
+    return ""
 
 
 def _extract_choice(text: str, extractor: str, regex: str | None) -> str:
+    """从模型回复中抽取选项字母（支持单选和多选）。
+
+    返回格式：排序去重的大写字母拼接，如 "B" / "BCDE" / "ACD"。
+    """
+    if not text:
+        return ""
+
     if extractor == "regex":
         if not regex:
             raise ValueError("extractor=regex 需要 extractor_regex")
         m = re.search(regex, text)
-        return m.group(1).upper() if m else ""
+        if m:
+            return _normalize_choice_letters(m.group(1))
+        return ""
     if extractor == "en_the_answer":
         m = _EN_THE_ANSWER_RE.search(text)
         return m.group(1).upper() if m else ""
     if extractor == "last_letter":
         found = _LAST_LETTER_RE.findall(text)
         return found[-1].upper() if found else ""
-    # default cn_final_answer
+
+    # default: cn_final_answer（增强版，支持多选）
+    # 策略 1：行首 "答案：X" — 最可靠，医学/金融选择题标准格式
+    m = _CN_ANSWER_LINE_RE.search(text)
+    if m:
+        return _normalize_choice_letters(m.group(1))
+
+    # 策略 2："最终答案是/为/：X"
     m = _CN_FINAL_RE.search(text)
     if m:
-        return m.group(1).upper()
-    found = _LAST_LETTER_RE.findall(text)
-    return found[-1].upper() if found else ""
+        return _normalize_choice_letters(m.group(1))
+
+    # 策略 3：变体表述（"正确答案为X" / "综上…选X"）
+    for pat in _CN_ANSWER_VARIANT_PATTERNS:
+        m = pat.search(text)
+        if m:
+            return _normalize_choice_letters(m.group(1))
+
+    # 策略 4：最后手段 — 仅对短文本启用，避免长解析中误抓
+    if len(text) < _SHORT_TEXT_THRESHOLD:
+        found = _LAST_LETTER_RE.findall(text)
+        if found:
+            return found[-1].upper()
+
+    return ""
 
 
 # ============================================================================
@@ -69,9 +127,11 @@ class Accuracy(Metric):
 
     def compute(self, sample: Sample, output: RunOutput, judge=None, **_kwargs) -> MetricResult:
         gt_raw = sample.ground_truth.answer
-        gt = (str(gt_raw) if gt_raw is not None else "").strip().upper()
+        gt_str = (str(gt_raw) if gt_raw is not None else "").strip().upper()
+        # 标准化 GT：提取字母并排序去重（兼容 "BCDE" / "B,C,D,E" / "B" 等格式）
+        gt = _normalize_choice_letters(gt_str) if gt_str else ""
         pred = _extract_choice(output.final_text, self.spec.extractor, self.spec.extractor_regex)
-        ok = 1.0 if pred and pred == gt else 0.0
+        ok = 1.0 if pred and gt and pred == gt else 0.0
         return MetricResult(
             self.column, ok,
             reason=f"expected={gt} actual={pred} extractor={self.spec.extractor}",

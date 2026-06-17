@@ -1,0 +1,30 @@
+experiment_name: medical_exam_eval_5
+tags: [medical, smoke, sampled5]
+dataset:
+  name: Medical-Exam-Eval
+sampling:
+  mode: n
+  n: 5
+
+prompt_strategy:
+  user_template: |
+    {prompt}
+
+model_under_test:
+  host_profile: sota
+  model: gpt-5.4
+  run_prefix: gpt52
+
+judge:
+  host_profile: sota
+  model: sota/claude-sonnet-4
+  temperature: 0
+
+metrics:
+  - accuracy
+
+execution:
+  rounds: 1
+  concurrency: 3
+  reporter: [csv, lumi]
+  resume: false

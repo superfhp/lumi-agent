@@ -19,9 +19,9 @@ metadata:
 | 用户说「帮我跑一次通用领域评测」 | 先执行 `source /mnt/workspace/lumi-agent/venv/bin/activate && python -m eval_skill.cli list-datasets --domain common` | 禁止 search/grep/ls/find/扫描本地 CSV/读取历史会话来猜 dataset；禁止改用 finance |
 | 用户说「帮我跑一次金融领域评测」 | 先执行 `source /mnt/workspace/lumi-agent/venv/bin/activate && python -m eval_skill.cli list-datasets --domain finance` | 禁止 search/grep/ls/find/扫描本地 CSV/读取历史会话来猜 dataset；禁止改用 common |
 | 第 1 步列 dataset | 只展示 CLI 返回的 `metadata.domain=<用户指定领域>` 结果 | 禁止展示其他 domain 的 dataset |
-| 第 2 步预览 dataset | 必须保留 `view_dataset` 输出里的 `tag_id 中文名`，如 `R-FACT-3 时效错误` | 禁止把预期信号摘要成只有 tag_id |
+| 第 2 步预览 dataset | 向用户展示样例的 category、prompt、answer/rubric；预览末尾的全量评测集链接一并转发给用户 | 禁止在预览中展示预期信号 expected_signals |
 | 用户未确认 dataset/model/judge/rules | 只能 list / preview / describe / dry-run | 禁止 `python -m eval_skill.cli run ...` |
-| 执行结果汇报 | 必须给出 `samples.csv`、`summary.json` 路径；若 reporter 含 `lumi`，还要说明已创建/关联 Lumi trace 与 experiment run | 禁止只报均值不报产物路径 |
+| 执行结果汇报 | 必须给出 `samples.csv`、`summary.json` 路径；转发 CLI 输出的评测结果表格（question/expected/actual/score/reason）和 Langfuse 实验链接 | 禁止只报均值不报产物路径和明细 |
 
 执行位置要求：`python -m eval_skill.cli ...` 必须在 **eval_skill 包的父目录**执行。Hermes 环境默认使用：
 
@@ -124,9 +124,8 @@ python -m eval_skill.cli preview-dataset --name <用户选择的dataset> --limit
 ```
 
 输出要求：
-- 必须保留 CLI 中 `expected_signals` 的中文化结果，格式为 `tag_id 中文名`，例如 `R-FACT-3 时效错误`、`V-EXE-1 字数约束未遵循`。
-- 如果 pack 查不到，按 CLI 原样显示 `tag_id (未知)`，不要擅自补中文。
-- 向用户复述时不得只写 `R-FACT-3、V-EXE-1` 这种裸 tag_id。
+- 预览展示样例的 category、prompt、answer/rubric，不展示预期信号（expected_signals）。
+- CLI 末尾会输出「🔗 查看全量评测集」链接，必须一并转发给用户。
 - 预览完成后必须停下问用户是否继续第 3 步；不要自动进入 `describe-config`。
 
 ### Step 3 · 展示评测计划，不实际执行
@@ -156,7 +155,8 @@ python -m eval_skill.cli run -c <yaml>
 执行后必须向用户回显：
 - `samples.csv` 路径（来自 `[reporter] CSV 已写入:` 或 `[evaluator] done. samples.csv =>`）
 - `summary.json` 路径
-- 若启用 `lumi`，说明每条样本 trace 已按 `runName=<experiment>__<run_prefix>__round<N>` 关联到 dataset item，Lumi Experiments 视图可查。
+- CLI 输出的评测结果表格（包含 question / expected / actual / score / reason）必须原样转发给用户
+- CLI 输出的 Langfuse 实验结果链接（🔗）必须原样转发给用户
 - 若使用 `rvec_judge`，Lumi trace 里必须能看到 step 级 observation/span：`step1_understand`、`step2_R`、`step2_V`、`step2_E`、`step2_C`、`aggregate`、`step3_scoring`；trace output / CSV 里必须包含命中的 `bad_tags_json` / `good_tags_json`（同 `bad_signals_json` / `good_signals_json`）。
 
 ### 3.0 标准评测流程：评测前 5 步（重要 — 用户没指定 yaml 时务必照走）
@@ -166,11 +166,11 @@ python -m eval_skill.cli run -c <yaml>
 | # | 步骤 | 用什么 | 要拿到什么 |
 |---|---|---|---|
 | 1 | **列评测集** | `cli list-datasets --domain <domain>`；通用=common，金融=finance | 只展示 metadata.domain=<domain> 的 dataset 清单 |
-| 2 | **预览数据** | `cli preview-dataset --name <Y> --limit 5` | 5 条样例 + schema/turn_kind/expected_signals 中文化展示；预期信号必须保留 `tag_id 中文名` |
+| 2 | **预览数据** | `cli preview-dataset --name <Y> --limit 5` | 5 条样例 + schema/turn_kind/answer 展示；末尾附带全量评测集链接 |
 | 3 | **看评测规则** | `cli describe-config -c <yaml>` | yaml 里 metric / pack / caps / 模型 / reporter / 预计 LLM 调用量；确认 reporter 含 `csv`，需要 Lumi trace 时含 `lumi` |
 | 4a | **（可选）改 prompt 包** | `cli upload-prompt[-pack] --dry-run` 先看回显 | 占位符列表 / pack 元信息 / signals 抽样；用户确认后去掉 `--dry-run` 真传 |
 | 4b | **（可选）改 dataset** | `cli upload-dataset --dry-run` | 解析后的 5 条预览；用户确认后真传 |
-| 5 | **执行** | `cli run -c <yaml>` | 实际跑一次；结束后必须回传 `samples.csv`、`summary.json`、Lumi run/trace 状态 |
+| 5 | **执行** | `cli run -c <yaml>` | 实际跑一次；结束后必须转发 `samples.csv`、`summary.json`、评测结果表格、Langfuse 实验链接 |
 
 约定：
 - 用户说「通用领域评测」时，`domain` 固定为 `common`；用户说「金融领域评测」时，`domain` 固定为 `finance`。不要自行替换成其他 domain，也不要从本地文件/历史搜索结果归纳候选集。
